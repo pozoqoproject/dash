@@ -80,13 +80,12 @@ struct Params {
     int DIP0001Height;
     /** Block height at which DIP0003 becomes active */
     int DIP0003Height;
+    int BRRHeight;
     /** Block height at which DIP0003 becomes enforced */
     int DIP0003EnforcementHeight;
     uint256 DIP0003EnforcementHash;
     /** Block height at which DIP0008 becomes active */
     int DIP0008Height;
-    /** Block height at which BRR becomes active */
-    int BRRHeight;
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and DIP activations. */
     int MinBIP9WarningHeight;

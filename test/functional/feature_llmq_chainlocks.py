@@ -12,13 +12,13 @@ Checks LLMQs based ChainLocks
 
 import time
 
-from test_framework.test_framework import DashTestFramework
+from test_framework.test_framework import PozoqoTestFramework
 from test_framework.util import force_finish_mnsync
 
 
-class LLMQChainLocksTest(DashTestFramework):
+class LLMQChainLocksTest(PozoqoTestFramework):
     def set_test_params(self):
-        self.set_dash_test_params(4, 3, fast_dip3_enforcement=True)
+        self.set_pozoqo_test_params(4, 3, fast_dip3_enforcement=True)
 
     def run_test(self):
 

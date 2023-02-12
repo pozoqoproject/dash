@@ -11,7 +11,7 @@ Checks LLMQs Quorum Rotation
 '''
 from io import BytesIO
 
-from test_framework.test_framework import DashTestFramework
+from test_framework.test_framework import PozoqoTestFramework
 from test_framework.messages import CBlock, CBlockHeader, CCbTx, CMerkleBlock, FromHex, hash256, msg_getmnlistd, QuorumId
 from test_framework.mininode import P2PInterface
 from test_framework.util import (
@@ -49,10 +49,10 @@ class TestP2PConn(P2PInterface):
         self.wait_for_mnlistdiff()
         return self.last_mnlistdiff
 
-class LLMQQuorumRotationTest(DashTestFramework):
+class LLMQQuorumRotationTest(PozoqoTestFramework):
     def set_test_params(self):
-        self.set_dash_test_params(9, 8, fast_dip3_enforcement=True)
-        self.set_dash_llmq_test_params(4, 4)
+        self.set_pozoqo_test_params(9, 8, fast_dip3_enforcement=True)
+        self.set_pozoqo_llmq_test_params(4, 4)
 
     def run_test(self):
         llmq_type=103

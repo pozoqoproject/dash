@@ -12,17 +12,17 @@ Checks intra quorum connections
 
 import time
 
-from test_framework.test_framework import DashTestFramework
+from test_framework.test_framework import PozoqoTestFramework
 from test_framework.util import assert_greater_than_or_equal, Options, wait_until
 
 # Probes should age after this many seconds.
 # NOTE: mine_quorum() can bump mocktime quite often internally so make sure this number is high enough.
 MAX_AGE = 120 * Options.timeout_scale
 
-class LLMQConnections(DashTestFramework):
+class LLMQConnections(PozoqoTestFramework):
     def set_test_params(self):
-        self.set_dash_test_params(15, 14, fast_dip3_enforcement=True)
-        self.set_dash_llmq_test_params(5, 3)
+        self.set_pozoqo_test_params(15, 14, fast_dip3_enforcement=True)
+        self.set_pozoqo_llmq_test_params(5, 3)
 
     def run_test(self):
         self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", 0)
