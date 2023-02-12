@@ -17,7 +17,7 @@ import struct
 from test_framework.blocktools import get_masternode_payment, create_coinbase, create_block
 from test_framework.messages import CCbTx, CInv, COIN, CTransaction, FromHex, hash256, msg_clsig, msg_inv, ser_string, ToHex, uint256_from_str, uint256_to_string
 from test_framework.mininode import P2PInterface
-from test_framework.test_framework import DashTestFramework
+from test_framework.test_framework import PozoqoTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, hex_str_to_bytes, get_bip9_status, wait_until
 
 
@@ -49,10 +49,10 @@ class TestP2PConn(P2PInterface):
                 self.send_message(self.islocks[inv.hash])
 
 
-class LLMQ_IS_CL_Conflicts(DashTestFramework):
+class LLMQ_IS_CL_Conflicts(PozoqoTestFramework):
     def set_test_params(self):
-        self.set_dash_test_params(5, 4, fast_dip3_enforcement=True)
-        self.set_dash_llmq_test_params(4, 4)
+        self.set_pozoqo_test_params(5, 4, fast_dip3_enforcement=True)
+        self.set_pozoqo_llmq_test_params(4, 4)
         self.supports_cli = False
 
     def run_test(self):

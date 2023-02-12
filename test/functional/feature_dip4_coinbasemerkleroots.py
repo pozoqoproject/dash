@@ -14,7 +14,7 @@ from io import BytesIO
 
 from test_framework.messages import CBlock, CBlockHeader, CCbTx, CMerkleBlock, FromHex, hash256, msg_getmnlistd, QuorumId, ser_uint256
 from test_framework.mininode import P2PInterface
-from test_framework.test_framework import DashTestFramework
+from test_framework.test_framework import PozoqoTestFramework
 from test_framework.util import assert_equal, wait_until
 
 
@@ -39,10 +39,10 @@ class TestP2PConn(P2PInterface):
         return self.last_mnlistdiff
 
 
-class LLMQCoinbaseCommitmentsTest(DashTestFramework):
+class LLMQCoinbaseCommitmentsTest(PozoqoTestFramework):
     def set_test_params(self):
         extra_args = [["-vbparams=dip0024:999999999999:999999999999"]] * 4 # disable dip0024
-        self.set_dash_test_params(4, 3, extra_args=extra_args, fast_dip3_enforcement=True)
+        self.set_pozoqo_test_params(4, 3, extra_args=extra_args, fast_dip3_enforcement=True)
 
     def run_test(self):
         self.test_node = self.nodes[0].add_p2p_connection(TestP2PConn())
@@ -56,7 +56,7 @@ class LLMQCoinbaseCommitmentsTest(DashTestFramework):
         mnList = self.test_getmnlistdiff(null_hash, self.nodes[0].getbestblockhash(), {}, [], expectedUpdated)
         expectedUpdated2 = expectedUpdated + []
 
-        # Register one more MN, but don't start it (that would fail as DashTestFramework doesn't support this atm)
+        # Register one more MN, but don't start it (that would fail as PozoqoTestFramework doesn't support this atm)
         baseBlockHash = self.nodes[0].getbestblockhash()
         self.prepare_masternode(self.mn_count)
         new_mn = self.mninfo[self.mn_count]

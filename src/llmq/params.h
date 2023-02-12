@@ -41,7 +41,7 @@ enum class LLMQType : uint8_t {
 };
 
 // Configures a LLMQ and its DKG
-// See https://github.com/dashpay/dips/blob/master/dip-0006.md for more details
+// See https://github.com/pozoqoproject/dips/blob/master/dip-0006.md for more details
 struct LLMQParams {
     LLMQType type;
 
@@ -162,7 +162,7 @@ static constexpr std::array<LLMQParams, 14> available_llmqs = {
     },
 
     /**
-     * llmq_test (Dash Core 0.17) aka llmq_test_v17
+     * llmq_test (Pozoqo Core 0.17) aka llmq_test_v17
      * This quorum is only used for testing
      *
      */
@@ -329,7 +329,7 @@ static constexpr std::array<LLMQParams, 14> available_llmqs = {
         .dkgPhaseBlocks = 2,
         .dkgMiningWindowStart = 10, // dkgPhaseBlocks * 5 = after finalization
         .dkgMiningWindowEnd = 18,
-        .dkgBadVotesThreshold = 40,
+        .dkgBadVotesThreshold = 4,
 
         .signingActiveQuorumCount = 2, // a full day worth of LLMQs
         .keepOldConnections = 2,
@@ -419,7 +419,7 @@ static constexpr std::array<LLMQParams, 14> available_llmqs = {
      * This quorum is deployed on mainnet and requires
      * 80 - 100 participants
      *
-     * Used by Dash Platform
+     * Used by Pozoqo Platform
      */
     LLMQParams{
         .type = LLMQType::LLMQ_100_67,
@@ -446,7 +446,7 @@ static constexpr std::array<LLMQParams, 14> available_llmqs = {
      * This quorum is deployed on Testnet and requires
      * 25 participants
      *
-     * Used by Dash Platform
+     * Used by Pozoqo Platform
      */
     LLMQParams{
         .type = LLMQType::LLMQ_25_67,

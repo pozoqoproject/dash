@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef DASH_CRYPTO_BLS_H
-#define DASH_CRYPTO_BLS_H
+#ifndef PZQ_CRYPTO_BLS_H
+#define PZQ_CRYPTO_BLS_H
 
 #include <hash.h>
 #include <serialize.h>
@@ -589,4 +589,4 @@ using BLSVerificationVectorPtr = std::shared_ptr<BLSVerificationVector>;
 
 bool BLSInit();
 
-#endif // DASH_CRYPTO_BLS_H
+#endif // PZQ_CRYPTO_BLS_H
