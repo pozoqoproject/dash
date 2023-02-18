@@ -31,6 +31,7 @@ CSipHasher& CSipHasher::Write(uint64_t data)
 
     assert(count % 8 == 0);
 
+
     v3 ^= data;
     SIPROUND;
     SIPROUND;

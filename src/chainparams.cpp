@@ -166,15 +166,15 @@ public:
         consensus.nGovernanceFilterElements = 20000;
         consensus.nMasternodeMinimumConfirmations = 15;
         consensus.BIP34Height = 10;
-        consensus.BIP34Hash = uint256S("");
-        consensus.BIP65Height = 10; // 00000000000076d8fcea02ec0963de4abfd01e771fec0863f960c2c64fe6f357
-        consensus.BIP66Height = 10; // 00000000000b1fa2dfa312863570e13fae9ca7b5566cb27e55422620b469aefa
+        consensus.BIP34Hash = uint256S("00000b789ab605a84769b7616fff73677f83117bfd351195b7ea3720717dd25c");
+        consensus.BIP65Height = 10; // 00000b789ab605a84769b7616fff73677f83117bfd351195b7ea3720717dd25c
+        consensus.BIP66Height = 10; // 00000b789ab605a84769b7616fff73677f83117bfd351195b7ea3720717dd25c
         consensus.DIP0001Height = 10;
         consensus.DIP0003Height = 10;
         consensus.DIP0003EnforcementHeight = 200;
-        consensus.DIP0003EnforcementHash = uint256S("");
-        consensus.DIP0008Height = 200; // 00000000000000112e41e4b3afda8b233b8cc07c532d2eac5de097b68358c43e
-        consensus.BRRHeight = 200; // 000000000000000c5a124f3eccfbe6e17876dca79cec9e63dfa70d269113c926
+        consensus.DIP0003EnforcementHash = uint256S("0x000005560c210faa9414fa2126d568f707cef76af7a69db3f27dd9e23d146569");
+        consensus.DIP0008Height = 200; // 000005560c210faa9414fa2126d568f707cef76af7a69db3f27dd9e23d146569
+        consensus.BRRHeight = 200; // 000005560c210faa9414fa2126d568f707cef76af7a69db3f27dd9e23d146569
         consensus.MinBIP9WarningHeight = 200; // dip8 activation height + miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~uint256(0) >> 20
         consensus.nPowTargetTimespan = 60; // Pozoqo: 1 day
@@ -189,41 +189,41 @@ public:
 
         // Deployment of BIP68, BIP112, and BIP113.
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1707807600;   // Monday, February 13, 2023 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
 
         // Deployment of DIP0001
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].bit = 1;
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0001].nThresholdStart = 3226; // 80% of 4032
 
         // Deployment of BIP147
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].bit = 2;
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_BIP147].nThresholdStart = 3226; // 80% of 4032
 
         // Deployment of DIP0003
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].bit = 3;
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0003].nThresholdStart = 3226; // 80% of 4032
 
         // Deployment of DIP0008
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].bit = 4;
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0008].nThresholdStart = 3226; // 80% of 4032
 
         // Deployment of Block Reward Reallocation
         consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].bit = 5;
-        consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nThresholdStart = 3226; // 80% of 4032
         consensus.vDeployments[Consensus::DEPLOYMENT_REALLOC].nThresholdMin = 2420; // 60% of 4032
@@ -231,8 +231,8 @@ public:
 
         // Deployment of DIP0020, DIP0021 and LLMQ_100_67 quorums
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].bit = 6;
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nThresholdStart = 3226; // 80% of 4032
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0020].nThresholdMin = 2420; // 60% of 4032
@@ -240,18 +240,18 @@ public:
 
         // Deployment of Quorum Rotation DIP and decreased proposal fee (Values to be determined)
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].bit = 7;
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nStartTime = 1676271600; // Monday, February 13, 2023 7:00:00 AM
-        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nTimeout = 1707807600;   // Monday, February 13, 2024 7:00:00 AM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nStartTime = 1676721600; // Saturday, February 18, 2023 12:00:00 PM
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nTimeout = 1708257600;   // Sunday, February 18, 2024 12:00:00 PM
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nWindowSize = 4032;
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdStart = 3226; // 80% of 4032
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdMin = 2420;   // 60% of 4032
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nFalloffCoeff = 5;      // this corresponds to 10 periods
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x"); // 
+        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000000001eeb2416");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x"); //
+        consensus.defaultAssumeValid = uint256S("0x000007f3bb8e1093f11dcf7e75b552a3e81baff7a4635d815c644b684674d725"); //
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -327,16 +327,21 @@ public:
 
         checkpointData = {
             {
-                {0, uint256S("0x")},
+                {0,   uint256S("0x00000c9a4d546d148187c142944cf4045de11d4bb4d6306435f1a4b420c44285")},
+                {1,   uint256S("0x00000648eb31922308dfb7b561a53dd89601ecc7790848cc69c8cf24cf93c8e4")},
+                {10,  uint256S("0x00000b789ab605a84769b7616fff73677f83117bfd351195b7ea3720717dd25c")},
+                {100, uint256S("0x0000055e010d5de3f8283eec89f1cad40c77a8b52d78c6a13818a2bbc96e1f42")},
+                {300, uint256S("0x00000966010cdeedf882fa87a22cce50b5d1045c0ac7e2a41330e99db12c3c35")},
+                {350, uint256S("0x0000009a0366afbd0af870b6a8c20a34f4eaab39f52b39b672865b02a9aad7da")},
+
             }
         };
 
         // getchaintxstats 17280 000000000000001d531f36005159f19351bd49ca676398a561e55dcccb84eacd
         chainTxData = ChainTxData{
-                1672362622, // * UNIX timestamp of last known number of transactions (Block 1718597)
-                0,   // * total number of transactions between genesis and that timestamp
-                            //   (the tx=... number in the ChainStateFlushed debug.log lines)
-                0       // * estimated number of transactions per second after that timestamp
+                1676706219,
+                599,
+                0.01419130930873823,
         };
     }
 };
