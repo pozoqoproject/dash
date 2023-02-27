@@ -181,6 +181,7 @@ public:
         consensus.nPowTargetSpacing = 60; // Pozoqo: 2.5 minutes
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
+        consensus.nPOWR = 8000;
         consensus.nRuleChangeActivationThreshold = 95; // 95% of 2016
         consensus.nMinerConfirmationWindow = 1; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
