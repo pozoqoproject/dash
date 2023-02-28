@@ -292,9 +292,10 @@ bool CMasternodePayments::GetBlockTxOuts(int nBlockHeight, CAmount blockReward, 
         masternodeReward -= operatorReward;
     }
 
-    if (masternodeReward > 0) {
+    if (masternodeReward > 0 && nBlockHeight >= Params().GetConsensus().nPOWR) {
         voutMasternodePaymentsRet.emplace_back(masternodeReward, dmnPayee->pdmnState->scriptPayout);
     }
+
     if (operatorReward > 0) {
         voutMasternodePaymentsRet.emplace_back(operatorReward, dmnPayee->pdmnState->scriptOperatorPayout);
     }
@@ -304,6 +305,19 @@ bool CMasternodePayments::GetBlockTxOuts(int nBlockHeight, CAmount blockReward, 
 
 bool CMasternodePayments::IsTransactionValid(const CTransaction& txNew, int nBlockHeight, CAmount blockReward)
 {
+    // Disable all masternodes with registered collateral of 1000 DASH at block height below 2000
+    if (nBlockHeight >= Params().GetConsensus().nPOWR) {
+        for (const auto& txout : txNew.vout) {
+            if (txout.nValue == MN_COLLATERAL) {
+                CTxDestination dest;
+                if (!ExtractDestination(txout.scriptPubKey, dest))
+                    assert(false);
+                LogPrintf("CMasternodePayments::%s -- ERROR: masternode with collateral of 1000 DASH at block height below 2000 is disabled\n", __func__);
+                return false;
+            }
+        }
+    }
+
     if (!deterministicMNManager->IsDIP3Enforced(nBlockHeight)) {
         // can't verify historical blocks here
         return true;
@@ -311,7 +325,7 @@ bool CMasternodePayments::IsTransactionValid(const CTransaction& txNew, int nBlo
 
     std::vector<CTxOut> voutMasternodePayments;
     if (!GetBlockTxOuts(nBlockHeight, blockReward, voutMasternodePayments)) {
-        LogPrintf("CMasternodePayments::%s -- ERROR failed to get payees for block at height %s\n", __func__, nBlockHeight);
+        LogPrintf("CMasternodePayments::%s -- ERROR: failed to get payees for block at height %s\n", __func__, nBlockHeight);
         return true;
     }
 
@@ -321,7 +335,7 @@ bool CMasternodePayments::IsTransactionValid(const CTransaction& txNew, int nBlo
             CTxDestination dest;
             if (!ExtractDestination(txout.scriptPubKey, dest))
                 assert(false);
-            LogPrintf("CMasternodePayments::%s -- ERROR failed to find expected payee %s in block at height %s\n", __func__, EncodeDestination(dest), nBlockHeight);
+            LogPrintf("CMasternodePayments::%s -- ERROR: failed to find expected payee %s in block at height %s\n", __func__, EncodeDestination(dest), nBlockHeight);
             return false;
         }
     }

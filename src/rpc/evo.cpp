@@ -321,7 +321,7 @@ static std::string SignAndSendSpecialTx(const JSONRPCRequest& request, const CMu
 static void protx_register_fund_help(const JSONRPCRequest& request)
 {
     RPCHelpMan{"protx register_fund",
-        "\nCreates, funds and sends a ProTx to the network. The resulting transaction will move 1000 Pozoqo\n"
+        "\nCreates, funds and sends a ProTx to the network. The resulting transaction will move 1000 and 200000 Pozoqo from height 7000\n"
         "to the address specified by collateralAddress and will then function as the collateral of your\n"
         "masternode.\n"
         "A few of the limitations you see in the arguments are temporary and might be lifted after DIP3\n"
@@ -455,26 +455,26 @@ static UniValue protx_register(const JSONRPCRequest& request)
 
     size_t paramIdx = 0;
 
-    CAmount collateralAmount = 1000 * COIN;
+   CAmount collateralAmount = MN_COLLATERAL;
 
-    CMutableTransaction tx;
-    tx.nVersion = 3;
-    tx.nType = TRANSACTION_PROVIDER_REGISTER;
+   CMutableTransaction tx;
+   tx.nVersion = 3;
+   tx.nType = TRANSACTION_PROVIDER_REGISTER;
 
-    CProRegTx ptx;
-    ptx.nVersion = CProRegTx::CURRENT_VERSION;
+   CProRegTx ptx;
+   ptx.nVersion = CProRegTx::CURRENT_VERSION;
 
-    if (isFundRegister) {
-        CTxDestination collateralDest = DecodeDestination(request.params[paramIdx].get_str());
-        if (!IsValidDestination(collateralDest)) {
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("invalid collaterall address: %s", request.params[paramIdx].get_str()));
-        }
-        CScript collateralScript = GetScriptForDestination(collateralDest);
+   if (isFundRegister && chainActive.Height() >= Params().GetConsensus().nPOWR) {
+    CTxDestination collateralDest = DecodeDestination(request.params[paramIdx].get_str());
+    if (!IsValidDestination(collateralDest)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("invalid collaterall address: %s", request.params[paramIdx].get_str()));
+    }
+    CScript collateralScript = GetScriptForDestination(collateralDest);
 
-        CTxOut collateralTxOut(collateralAmount, collateralScript);
-        tx.vout.emplace_back(collateralTxOut);
+    CTxOut collateralTxOut(collateralAmount, collateralScript);
+    tx.vout.emplace_back(collateralTxOut);
 
-        paramIdx++;
+    paramIdx++;
     } else {
         uint256 collateralHash = ParseHashV(request.params[paramIdx], "collateralHash");
         int32_t collateralIndex = ParseInt32V(request.params[paramIdx + 1], "collateralIndex");
@@ -542,7 +542,8 @@ static UniValue protx_register(const JSONRPCRequest& request)
         fSubmit = ParseBoolV(request.params[paramIdx + 7], "submit");
     }
 
-    if (isFundRegister) {
+    if (isFundRegister && chainActive.Height() >= Params().GetConsensus().nPOWR) {
+        CAmount collateralAmount = MN_COLLATERAL_2;
         uint32_t collateralIndex = (uint32_t) -1;
         for (uint32_t i = 0; i < tx.vout.size(); i++) {
             if (tx.vout[i].nValue == collateralAmount) {

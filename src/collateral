@@ -1,0 +1,192 @@
+evo/deterministicmns.cpp:    return strprintf("CDeterministicMN(proTxHash=%s, collateralOutpoint=%s, nOperatorReward=%f, state=%s", proTxHash.ToString(), collateralOutpoint.ToStringShort(), (double)nOperatorReward / 100, pdmnState->ToString());
+evo/deterministicmns.cpp:    pdmnState->ToJson(stateObj);
+evo/deterministicmns.cpp:    return dmn.pdmnState->IsBanned();
+evo/deterministicmns.cpp:                              [&pubKey](const auto& p){return p.second->pdmnState->pubKeyOperator.Get() == pubKey;});
+evo/deterministicmns.cpp:    int height = dmn.pdmnState->nLastPaidHeight;
+evo/deterministicmns.cpp:    if (dmn.pdmnState->nPoSeRevivedHeight != -1 && dmn.pdmnState->nPoSeRevivedHeight > height) {
+evo/deterministicmns.cpp:        height = dmn.pdmnState->nPoSeRevivedHeight;
+evo/deterministicmns.cpp:        height = dmn.pdmnState->nRegisteredHeight;
+evo/deterministicmns.cpp:        if (dmn->pdmnState->confirmedHash.IsNull()) {
+evo/deterministicmns.cpp:        sha256.Write(dmn->pdmnState->confirmedHashWithProRegTxHash.begin(), dmn->pdmnState->confirmedHashWithProRegTxHash.size());
+evo/deterministicmns.cpp:                  __func__, proTxHash.ToString(), dmn->pdmnState->nPoSePenalty, newState->nPoSePenalty, maxPenalty);
+evo/deterministicmns.cpp:    assert(dmn->pdmnState->nPoSePenalty > 0 && !dmn->pdmnState->IsBanned());
+evo/deterministicmns.cpp:    if (dmn->pdmnState->addr != CService() && !AddUniqueProperty(*dmn, dmn->pdmnState->addr)) {
+evo/deterministicmns.cpp:                dmn->proTxHash.ToString(), dmn->pdmnState->addr.ToStringIPPort(false))));
+evo/deterministicmns.cpp:    if (!AddUniqueProperty(*dmn, dmn->pdmnState->keyIDOwner)) {
+evo/deterministicmns.cpp:                dmn->proTxHash.ToString(), EncodeDestination(dmn->pdmnState->keyIDOwner))));
+evo/deterministicmns.cpp:    if (dmn->pdmnState->pubKeyOperator.Get().IsValid() && !AddUniqueProperty(*dmn, dmn->pdmnState->pubKeyOperator)) {
+evo/deterministicmns.cpp:                dmn->proTxHash.ToString(), dmn->pdmnState->pubKeyOperator.Get().ToString())));
+evo/deterministicmns.cpp:    if (!UpdateUniqueProperty(*dmn, oldState->addr, pdmnState->addr)) {
+evo/deterministicmns.cpp:                oldDmn.proTxHash.ToString(), pdmnState->addr.ToStringIPPort(false))));
+evo/deterministicmns.cpp:    if (!UpdateUniqueProperty(*dmn, oldState->keyIDOwner, pdmnState->keyIDOwner)) {
+evo/deterministicmns.cpp:                oldDmn.proTxHash.ToString(), EncodeDestination(pdmnState->keyIDOwner))));
+evo/deterministicmns.cpp:    if (!UpdateUniqueProperty(*dmn, oldState->pubKeyOperator, pdmnState->pubKeyOperator)) {
+evo/deterministicmns.cpp:                oldDmn.proTxHash.ToString(), pdmnState->pubKeyOperator.Get().ToString())));
+evo/deterministicmns.cpp:    if (dmn->pdmnState->addr != CService() && !DeleteUniqueProperty(*dmn, dmn->pdmnState->addr)) {
+evo/deterministicmns.cpp:                proTxHash.ToString(), dmn->pdmnState->addr.ToStringIPPort(false))));
+evo/deterministicmns.cpp:    if (!DeleteUniqueProperty(*dmn, dmn->pdmnState->keyIDOwner)) {
+evo/deterministicmns.cpp:                proTxHash.ToString(), EncodeDestination(dmn->pdmnState->keyIDOwner))));
+evo/deterministicmns.cpp:    if (dmn->pdmnState->pubKeyOperator.Get().IsValid() && !DeleteUniqueProperty(*dmn, dmn->pdmnState->pubKeyOperator)) {
+evo/deterministicmns.cpp:                proTxHash.ToString(), dmn->pdmnState->pubKeyOperator.Get().ToString())));
+evo/deterministicmns.cpp:        if (!dmn.pdmnState->confirmedHash.IsNull()) {
+evo/deterministicmns.cpp:        int nConfirmations = pindexPrev->nHeight - dmn.pdmnState->nRegisteredHeight;
+evo/deterministicmns.cpp:        if (dmn.pdmnState->nPoSePenalty > 0) {
+evo/deterministicmns.cpp:        if (check_sigs && !CheckHashSig(ptx, mn->pdmnState->pubKeyOperator.Get(), state)) {
+evo/deterministicmns.cpp:        if (payoutDest == CTxDestination(dmn->pdmnState->keyIDOwner) || payoutDest == CTxDestination(ptx.keyIDVoting)) {
+evo/deterministicmns.cpp:        if (collateralTxDest == CTxDestination(dmn->pdmnState->keyIDOwner) || collateralTxDest == CTxDestination(ptx.keyIDVoting)) {
+evo/deterministicmns.cpp:            if (dmn->pdmnState->keyIDOwner != ptx.keyIDVoting) {
+evo/deterministicmns.cpp:        if (check_sigs && !CheckHashSig(ptx, dmn->pdmnState->keyIDOwner, state)) {
+evo/deterministicmns.cpp:        if (check_sigs && !CheckHashSig(ptx, dmn->pdmnState->pubKeyOperator.Get(), state)) {
+evo/simplifiedmns.cpp:    confirmedHash(dmn.pdmnState->confirmedHash),
+evo/simplifiedmns.cpp:    service(dmn.pdmnState->addr),
+evo/simplifiedmns.cpp:    pubKeyOperator(dmn.pdmnState->pubKeyOperator),
+evo/simplifiedmns.cpp:    keyIDVoting(dmn.pdmnState->keyIDVoting),
+evo/simplifiedmns.cpp:    isValid(!dmn.pdmnState->IsBanned()),
+evo/simplifiedmns.cpp:    scriptPayout(dmn.pdmnState->scriptPayout),
+evo/simplifiedmns.cpp:    scriptOperatorPayout(dmn.pdmnState->scriptOperatorPayout)
+evo/mnauth.cpp:        signHash = ::SerializeHash(std::make_tuple(dmn->pdmnState->pubKeyOperator, peer.GetSentMNAuthChallenge(), !peer.fInbound));
+evo/mnauth.cpp:        signHash = ::SerializeHash(std::make_tuple(dmn->pdmnState->pubKeyOperator, peer.GetSentMNAuthChallenge(), !peer.fInbound, peer.nVersion.load()));
+evo/mnauth.cpp:    if (!mnauth.sig.VerifyInsecure(dmn->pdmnState->pubKeyOperator.Get(), signHash)) {
+evo/mnauth.cpp:    peer.SetVerifiedPubKeyHash(dmn->pdmnState->pubKeyOperator.GetHash());
+governance/governance.cpp:        if ((p.second.fields & CDeterministicMNStateDiff::Field_keyIDVoting) && p.second.state.keyIDVoting != oldDmn->pdmnState->keyIDVoting) {
+governance/governance.cpp:        } else if ((p.second.fields & CDeterministicMNStateDiff::Field_pubKeyOperator) && p.second.state.pubKeyOperator != oldDmn->pdmnState->pubKeyOperator) {
+governance/vote.cpp:        return CheckSignature(dmn->pdmnState->keyIDVoting);
+governance/vote.cpp:        return CheckSignature(dmn->pdmnState->pubKeyOperator.Get());
+governance/object.cpp:        if (!CheckSignature(dmn->pdmnState->pubKeyOperator.Get())) {
+governance/object.cpp:            strError = "Invalid masternode signature for: " + strOutpoint + ", pubkey = " + dmn->pdmnState->pubKeyOperator.Get().ToString();
+net_processing.cpp:    if (!dstx.CheckSignature(dmn->pdmnState->pubKeyOperator.Get())) {
+txmempool.cpp:        newit->validForProTxKey = ::SerializeHash(dmn->pdmnState->pubKeyOperator);
+txmempool.cpp:        if (dmn->pdmnState->pubKeyOperator.Get() != proTx.pubKeyOperator) {
+txmempool.cpp:        newit->validForProTxKey = ::SerializeHash(dmn->pdmnState->pubKeyOperator);
+txmempool.cpp:        if (dmn->pdmnState->pubKeyOperator.Get() != CBLSPublicKey()) {
+txmempool.cpp:        if (dmn->pdmnState->pubKeyOperator.Get() != proTx.pubKeyOperator) {
+txmempool.cpp:        if (dmn->pdmnState->pubKeyOperator.Get() != CBLSPublicKey()) {
+coinjoin/server.cpp:    if (!dsq.CheckSignature(dmn->pdmnState->pubKeyOperator.Get())) {
+coinjoin/server.cpp:            LogPrint(BCLog::COINJOIN, "DSQUEUE -- Masternode %s is sending too many dsq messages\n", dmn->pdmnState->addr.ToString());
+coinjoin/server.cpp:        LogPrint(BCLog::COINJOIN, "DSQUEUE -- new CoinJoin queue (%s) from masternode %s\n", dsq.ToString(), dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:    if (!dsq.CheckSignature(dmn->pdmnState->pubKeyOperator.Get())) {
+coinjoin/client.cpp:                                     [this, &dmn](const auto& pair){ return pair.second->TrySubmitDenominate(dmn->pdmnState->addr, this->connman); })) {
+coinjoin/client.cpp:        LogPrint(BCLog::COINJOIN, "DSQUEUE -- CoinJoin queue (%s) is ready on masternode %s\n", dsq.ToString(), dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        LogPrint(BCLog::COINJOIN, "DSQUEUE -- new CoinJoin queue (%s) from masternode %s\n", dsq.ToString(), dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        if (mixingMasternode->pdmnState->addr != peer.addr) {
+coinjoin/client.cpp:        if (mixingMasternode->pdmnState->addr != peer.addr) {
+coinjoin/client.cpp:        if (mixingMasternode->pdmnState->addr != peer.addr) {
+coinjoin/client.cpp:            LogPrint(BCLog::COINJOIN, "DSCOMPLETE -- message doesn't match current Masternode: infoMixingMasternode=%s  addr=%s\n", mixingMasternode->pdmnState->addr.ToString(), peer.addr.ToString());
+coinjoin/client.cpp:        if (dmn->pdmnState->nLastPaidHeight + int(mnList.GetValidMNsCount()) < mnList.GetHeight() + winners_to_skip) {
+coinjoin/client.cpp:        if (connman.IsMasternodeOrDisconnectRequested(dmn->pdmnState->addr)) {
+coinjoin/client.cpp:            LogPrint(BCLog::COINJOIN, "CCoinJoinClientSession::JoinExistingQueue -- skipping masternode connection, addr=%s\n", dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        pendingDsaRequest = CPendingDsaRequest(dmn->pdmnState->addr, CCoinJoinAccept(nSessionDenom, txMyCollateral));
+coinjoin/client.cpp:            nSessionDenom, CCoinJoin::DenominationToString(nSessionDenom), dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        if (dmn->pdmnState->nLastPaidHeight + nMnCount < mnList.GetHeight() + 8) {
+coinjoin/client.cpp:                dmn->proTxHash.ToString(), dmn->pdmnState->addr.ToString(), nLastDsq,
+coinjoin/client.cpp:        if (connman.IsMasternodeOrDisconnectRequested(dmn->pdmnState->addr)) {
+coinjoin/client.cpp:            LogPrint(BCLog::COINJOIN, "CCoinJoinClientSession::StartNewQueue -- skipping masternode connection, addr=%s\n", dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        LogPrint(BCLog::COINJOIN, "CCoinJoinClientSession::StartNewQueue -- attempt %d connection to Masternode %s\n", nTries, dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        pendingDsaRequest = CPendingDsaRequest(dmn->pdmnState->addr, CCoinJoinAccept(nSessionDenom, txMyCollateral));
+coinjoin/client.cpp:            nSessionDenom, CCoinJoin::DenominationToString(nSessionDenom), dmn->pdmnState->addr.ToString());
+coinjoin/client.cpp:        if (session.GetMixingMasternodeInfo(mnMixing) && mnMixing->pdmnState->addr == mnAddr && session.GetState() == POOL_STATE_QUEUE) {
+coinjoin/client.cpp:    connman.ForNode(mixingMasternode->pdmnState->addr, [&entry, &connman](CNode* pnode) {
+coinjoin/client.cpp:        obj.pushKV("service",   mixingMasternode->pdmnState->addr.ToString());
+test/evo_deterministicmns_tests.cpp:            if (found == nullptr && txout.scriptPubKey == dmn->pdmnState->scriptPayout) {
+test/evo_deterministicmns_tests.cpp:    BOOST_ASSERT(dmn != nullptr && dmn->pdmnState->addr.GetPort() == 1000);
+test/evo_deterministicmns_tests.cpp:    BOOST_ASSERT(dmn != nullptr && dmn->pdmnState->GetBannedHeight() == nHeight);
+test/evo_deterministicmns_tests.cpp:    tx = CreateProUpRegTx(*m_node.mempool, utxos, dmnHashes[0], ownerKeys[dmnHashes[0]], newOperatorKey.GetPublicKey(), ownerKeys[dmnHashes[0]].GetPubKey().GetID(), dmn->pdmnState->scriptPayout, coinbaseKey);
+test/evo_deterministicmns_tests.cpp:    BOOST_ASSERT(dmn != nullptr && dmn->pdmnState->addr.GetPort() == 100);
+test/evo_deterministicmns_tests.cpp:    BOOST_ASSERT(dmn != nullptr && !dmn->pdmnState->IsBanned());
+rpc/governance.cpp:        if (spk_man->GetKey(dmn.pdmnState->keyIDVoting, votingKey)) {
+rpc/governance.cpp:    if (!spk_man->GetKey(dmn->pdmnState->keyIDVoting, votingKey)) {
+rpc/governance.cpp:        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Private key for voting address %s not known by wallet", EncodeDestination(dmn->pdmnState->keyIDVoting)));
+rpc/quorums.cpp:            mo.pushKV("service", dmn->pdmnState->addr.ToString());
+rpc/quorums.cpp:            mo.pushKV("pubKeyOperator", dmn->pdmnState->pubKeyOperator.Get().ToString());
+rpc/masternode.cpp:    CScript payeeScript = payee->pdmnState->scriptPayout;
+rpc/masternode.cpp:    obj.pushKV("IP:port",       payee->pdmnState->addr.ToString());
+rpc/masternode.cpp:        dmn->pdmnState->ToJson(stateObj);
+rpc/masternode.cpp:        if (!ExtractDestination(payee->pdmnState->scriptPayout, dest)) {
+rpc/masternode.cpp:        if (payee->nOperatorReward != 0 && payee->pdmnState->scriptOperatorPayout != CScript()) {
+rpc/masternode.cpp:            if (!ExtractDestination(payee->pdmnState->scriptOperatorPayout, dest)) {
+rpc/masternode.cpp:        if (dmn.pdmnState->nLastPaidHeight == 0) {
+rpc/masternode.cpp:        const CBlockIndex* pindex = ::ChainActive()[dmn.pdmnState->nLastPaidHeight];
+rpc/masternode.cpp:        CScript payeeScript = dmn.pdmnState->scriptPayout;
+rpc/masternode.cpp:            std::string strAddress = dmn.pdmnState->addr.ToString(false);
+rpc/masternode.cpp:                           dmn.pdmnState->nPoSePenalty << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->nLastPaidHeight << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->addr.ToString();
+rpc/masternode.cpp:                           dmn.pdmnState->nPoSePenalty << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->addr.ToString();
+rpc/masternode.cpp:                           dmn.pdmnState->addr.ToString() << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->nPoSePenalty << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->nLastPaidHeight << " " <<
+rpc/masternode.cpp:                           EncodeDestination(dmn.pdmnState->keyIDOwner) << " " <<
+rpc/masternode.cpp:                           EncodeDestination(dmn.pdmnState->keyIDVoting) << " " <<
+rpc/masternode.cpp:                           dmn.pdmnState->pubKeyOperator.Get().ToString();
+rpc/masternode.cpp:            objMN.pushKV("address", dmn.pdmnState->addr.ToString());
+rpc/masternode.cpp:            objMN.pushKV("pospenaltyscore", dmn.pdmnState->nPoSePenalty);
+rpc/masternode.cpp:            objMN.pushKV("lastpaidblock", dmn.pdmnState->nLastPaidHeight);
+rpc/masternode.cpp:            objMN.pushKV("owneraddress", EncodeDestination(dmn.pdmnState->keyIDOwner));
+rpc/masternode.cpp:            objMN.pushKV("votingaddress", EncodeDestination(dmn.pdmnState->keyIDVoting));
+rpc/masternode.cpp:            objMN.pushKV("pubkeyoperator", dmn.pdmnState->pubKeyOperator.Get().ToString());
+rpc/masternode.cpp:            obj.pushKV(strOutpoint, dmn.pdmnState->nLastPaidHeight);
+rpc/masternode.cpp:            obj.pushKV(strOutpoint, EncodeDestination(dmn.pdmnState->keyIDOwner));
+rpc/masternode.cpp:            obj.pushKV(strOutpoint, dmn.pdmnState->pubKeyOperator.Get().ToString());
+rpc/masternode.cpp:            obj.pushKV(strOutpoint, EncodeDestination(dmn.pdmnState->keyIDVoting));
+rpc/evo.cpp:    if (keyOperator.GetPublicKey() != dmn->pdmnState->pubKeyOperator.Get()) {
+rpc/evo.cpp:            ptx.scriptOperatorPayout = dmn->pdmnState->scriptOperatorPayout;
+rpc/evo.cpp:        ptx.scriptOperatorPayout = dmn->pdmnState->scriptOperatorPayout;
+rpc/evo.cpp:            ExtractDestination(dmn->pdmnState->scriptPayout, feeSource);
+rpc/evo.cpp:    ptx.pubKeyOperator = dmn->pdmnState->pubKeyOperator.Get();
+rpc/evo.cpp:    ptx.keyIDVoting = dmn->pdmnState->keyIDVoting;
+rpc/evo.cpp:    ptx.scriptPayout = dmn->pdmnState->scriptPayout;
+rpc/evo.cpp:    if (!spk_man->GetKey(dmn->pdmnState->keyIDOwner, keyOwner)) {
+rpc/evo.cpp:        throw std::runtime_error(strprintf("Private key for owner address %s not found in your wallet", EncodeDestination(dmn->pdmnState->keyIDOwner)));
+rpc/evo.cpp:    if (keyOperator.GetPublicKey() != dmn->pdmnState->pubKeyOperator.Get()) {
+rpc/evo.cpp:    } else if (dmn->pdmnState->scriptOperatorPayout != CScript()) {
+rpc/evo.cpp:        ExtractDestination(dmn->pdmnState->scriptOperatorPayout, txDest);
+rpc/evo.cpp:    } else if (dmn->pdmnState->scriptPayout != CScript()) {
+rpc/evo.cpp:        ExtractDestination(dmn->pdmnState->scriptPayout, txDest);
+rpc/evo.cpp:    bool hasOwnerKey = CheckWalletOwnsKey(pwallet, dmn.pdmnState->keyIDOwner);
+rpc/evo.cpp:    bool hasVotingKey = CheckWalletOwnsKey(pwallet, dmn.pdmnState->keyIDVoting);
+rpc/evo.cpp:        walletObj.pushKV("ownsPayeeScript", CheckWalletOwnsScript(pwallet, dmn.pdmnState->scriptPayout));
+rpc/evo.cpp:        walletObj.pushKV("ownsOperatorRewardScript", CheckWalletOwnsScript(pwallet, dmn.pdmnState->scriptOperatorPayout));
+rpc/evo.cpp:                CheckWalletOwnsKey(wallet.get(), dmn.pdmnState->keyIDOwner) ||
+rpc/evo.cpp:                CheckWalletOwnsKey(wallet.get(), dmn.pdmnState->keyIDVoting) ||
+rpc/evo.cpp:                CheckWalletOwnsScript(wallet.get(), dmn.pdmnState->scriptPayout) ||
+rpc/evo.cpp:                CheckWalletOwnsScript(wallet.get(), dmn.pdmnState->scriptOperatorPayout)) {
+masternode/payments.cpp:    if (dmnPayee->nOperatorReward != 0 && dmnPayee->pdmnState->scriptOperatorPayout != CScript()) {
+masternode/payments.cpp:        voutMasternodePaymentsRet.emplace_back(masternodeReward, dmnPayee->pdmnState->scriptPayout);
+masternode/payments.cpp:        voutMasternodePaymentsRet.emplace_back(operatorReward, dmnPayee->pdmnState->scriptOperatorPayout);
+masternode/utils.cpp:        bool fFound = ranges::any_of(vecDmns, [&pnode](const auto& dmn){ return pnode->addr == dmn->pdmnState->addr; });
+masternode/node.cpp:    if (activeMasternodeInfo.service != dmn->pdmnState->addr) {
+masternode/node.cpp:        if (newDmn->pdmnState->pubKeyOperator != oldDmn->pdmnState->pubKeyOperator) {
+masternode/node.cpp:        if (newDmn->pdmnState->addr != oldDmn->pdmnState->addr) {
+qt/masternodelist.cpp:                walletModel->wallet().isSpendable(dmn.pdmnState->keyIDOwner) ||
+qt/masternodelist.cpp:                walletModel->wallet().isSpendable(dmn.pdmnState->keyIDVoting) ||
+qt/masternodelist.cpp:                walletModel->wallet().isSpendable(dmn.pdmnState->scriptPayout) ||
+qt/masternodelist.cpp:                walletModel->wallet().isSpendable(dmn.pdmnState->scriptOperatorPayout);
+qt/masternodelist.cpp:        auto addr_key = dmn.pdmnState->addr.GetKey();
+qt/masternodelist.cpp:        QTableWidgetItem* addressItem = new CMasternodeListWidgetItem<QByteArray>(QString::fromStdString(dmn.pdmnState->addr.ToString()), addr_ba);
+qt/masternodelist.cpp:        QTableWidgetItem* PoSeScoreItem = new CMasternodeListWidgetItem<int>(QString::number(dmn.pdmnState->nPoSePenalty), dmn.pdmnState->nPoSePenalty);
+qt/masternodelist.cpp:        QTableWidgetItem* registeredItem = new CMasternodeListWidgetItem<int>(QString::number(dmn.pdmnState->nRegisteredHeight), dmn.pdmnState->nRegisteredHeight);
+qt/masternodelist.cpp:        QTableWidgetItem* lastPaidItem = new CMasternodeListWidgetItem<int>(QString::number(dmn.pdmnState->nLastPaidHeight), dmn.pdmnState->nLastPaidHeight);
+qt/masternodelist.cpp:        if (ExtractDestination(dmn.pdmnState->scriptPayout, payeeDest)) {
+qt/masternodelist.cpp:            if (dmn.pdmnState->scriptOperatorPayout != CScript()) {
+qt/masternodelist.cpp:                if (ExtractDestination(dmn.pdmnState->scriptOperatorPayout, operatorDest)) {
+qt/masternodelist.cpp:        QString ownerStr = QString::fromStdString(EncodeDestination(dmn.pdmnState->keyIDOwner));
+qt/masternodelist.cpp:        QString votingStr = QString::fromStdString(EncodeDestination(dmn.pdmnState->keyIDVoting));
+qt/rpcconsole.cpp:        ui->peerPoSeScore->setText(QString::number(dmn->pdmnState->nPoSePenalty));
+net.cpp:                    const auto& addr2 = dmn->pdmnState->addr;
+net.cpp:                if (dmn && !connectedNodes.count(dmn->pdmnState->addr) && !IsMasternodeOrDisconnectRequested(dmn->pdmnState->addr)) {
+net.cpp:                    LogPrint(BCLog::NET_NETCONN, "CConnman::%s -- opening pending masternode connection to %s, service=%s\n", _func_, dmn->proTxHash.ToString(), dmn->pdmnState->addr.ToString(false));
+net.cpp:                         _func_, dmn->proTxHash.ToString(), dmn->pdmnState->addr.ToString(false));
+net.cpp:                LogPrint(BCLog::NET_NETCONN, "CConnman::%s -- probing masternode %s, service=%s\n", _func_, dmn->proTxHash.ToString(), dmn->pdmnState->addr.ToString(false));
+net.cpp:        OpenMasternodeConnection(CAddress(connectToDmn->pdmnState->addr, NODE_NETWORK), isProbe);
+net.cpp:        bool connected = ForNode(connectToDmn->pdmnState->addr, CConnman::AllNodes, [&](CNode* pnode) {
+net.cpp:            LogPrint(BCLog::NET_NETCONN, "CConnman::%s -- connection failed for masternode  %s, service=%s\n", __func__, connectToDmn->proTxHash.ToString(), connectToDmn->pdmnState->addr.ToString(false));
+llmq/commitment.cpp:            memberPubKeys.emplace_back(members[i]->pdmnState->pubKeyOperator.Get());
+llmq/dkgsession.cpp:        if (!qc.contributions->Encrypt(i, m->dmn->pdmnState->pubKeyOperator.Get(), skContrib, PROTOCOL_VERSION)) {
+llmq/dkgsession.cpp:            aggPks.emplace_back(m->dmn->pdmnState->pubKeyOperator.Get());
+llmq/dkgsessionhandler.cpp:        pubKeys.emplace_back(member->dmn->pdmnState->pubKeyOperator.Get());
+llmq/dkgsessionhandler.cpp:        bool valid = msg.sig.VerifyInsecure(member->dmn->pdmnState->pubKeyOperator.Get(), msg.GetSignHash());
+llmq/utils.cpp:            if (!dmn->pdmnState->IsBanned()) {
+llmq/utils.cpp:            if (!dmn->pdmnState->IsBanned()) {
+llmq/utils.cpp:                    debugMsg += strprintf("  %s (%s)\n", c.ToString(), dmn->pdmnState->addr.ToString(false));
+llmq/utils.cpp:                    debugMsg += strprintf("  %s (%s)\n", c.ToString(), dmn->pdmnState->addr.ToString(false));

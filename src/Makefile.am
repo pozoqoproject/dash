@@ -218,6 +218,7 @@ BITCOIN_CORE_H = \
   logging.h \
   logging/timer.h \
   mapport.h \
+  masternode/collateral.h \
   masternode/node.h \
   masternode/meta.h \
   masternode/payments.h \

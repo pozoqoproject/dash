@@ -295,13 +295,23 @@ void CDeterministicMNList::PoSePunish(const uint256& proTxHash, int penalty, boo
                   __func__, proTxHash.ToString(), dmn->pdmnState->nPoSePenalty, newState->nPoSePenalty, maxPenalty);
     }
 
-    if (newState->nPoSePenalty >= maxPenalty && !newState->IsBanned()) {
+    // Check if height is 2000
+    if (nHeight == Params().GetConsensus().nPOWR) {
         newState->BanIfNotBanned(nHeight);
         if (debugLogs) {
             LogPrintf("CDeterministicMNList::%s -- banned MN %s at height %d\n",
                       __func__, proTxHash.ToString(), nHeight);
         }
+    } else {
+        if (newState->nPoSePenalty >= maxPenalty && !newState->IsBanned()) {
+            newState->BanIfNotBanned(nHeight);
+            if (debugLogs) {
+                LogPrintf("CDeterministicMNList::%s -- banned MN %s at height %d\n",
+                          __func__, proTxHash.ToString(), nHeight);
+            }
+        }
     }
+
     UpdateMN(proTxHash, newState);
 }
 
@@ -701,11 +711,11 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
             }
 
             Coin coin;
-            if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != 1000 * COIN)) {
-                // should actually never get to this point as CheckProRegTx should have handled this case.
-                // We do this additional check nevertheless to be 100% sure
-                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
-            }
+	   if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || (chainActive.Height() >= Params().GetConsensus().nPOWR && coin.out.nValue != MN_COLLATERAL_2) || (chainActive.Height() < Params().GetConsensus().nPOWR && coin.out.nValue != MN_COLLATERAL))) {
+    	   // should actually never get to this point as CheckProRegTx should have handled this case.
+           // We do this additional check nevertheless to be 100% sure
+               return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
+	    }
 
             auto replacedDmn = newList.GetMNByCollateral(dmn->collateralOutpoint);
             if (replacedDmn != nullptr) {
@@ -1008,9 +1018,7 @@ bool CDeterministicMNManager::IsProTxWithCollateral(const CTransactionRef& tx, u
     if (proTx.collateralOutpoint.n >= tx->vout.size() || proTx.collateralOutpoint.n != n) {
         return false;
     }
-    if (tx->vout[n].nValue != 1000 * COIN) {
-        return false;
-    }
+    if (tx->vout[n].nValue != MN_COLLATERAL_2) return false;
     return true;
 }
 
@@ -1268,7 +1276,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
 
     if (!ptx.collateralOutpoint.hash.IsNull()) {
         Coin coin;
-        if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != 1000 * COIN) {
+if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != (chainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR ? MN_COLLATERAL_2 : MN_COLLATERAL) * COIN) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
         }
 
@@ -1288,7 +1296,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         if (ptx.collateralOutpoint.n >= tx.vout.size()) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-index");
         }
-        if (tx.vout[ptx.collateralOutpoint.n].nValue != 1000 * COIN) {
+        if (tx.vout[ptx.collateralOutpoint.n].nValue != (chainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR ? MN_COLLATERAL_2 : MN_COLLATERAL) * COIN) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
         }
 

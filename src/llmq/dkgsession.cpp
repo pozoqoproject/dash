@@ -458,7 +458,11 @@ void CDKGSession::VerifyConnectionAndMinProtoVersions() const
         } else if (it->second < MIN_MASTERNODE_PROTO_VERSION) {
             m->badConnection = true;
             logger.Batch("%s does not have min proto version %d (has %d)", m->dmn->proTxHash.ToString(), MIN_MASTERNODE_PROTO_VERSION, it->second);
-        }
+        } else if (nPrevHeight >= consensusParams.nPOWR && it->second < MIN_MASTERNODE_PROTO_VERSION) {
+            m->badConnection = true;
+            logger.Batch("%s does not have min proto version %d (has %d)", m->dmn->proTxHash.ToString(), MIN_MASTERNODE_PROTO_VERSION, it->second);
+
+	}
 
         if (mmetaman.GetMetaInfo(m->dmn->proTxHash)->OutboundFailedTooManyTimes()) {
             m->badConnection = true;
