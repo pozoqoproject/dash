@@ -760,11 +760,20 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
             }
 
             Coin coin;
+             if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+            CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount2;
+            if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral)) {
+                // should actually never get to this point as CheckProRegTx should have handled this case.
+                // We do this additional check nevertheless to be 100% sure
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
+            }
+            } else {
             CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount;
             if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral)) {
                 // should actually never get to this point as CheckProRegTx should have handled this case.
                 // We do this additional check nevertheless to be 100% sure
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
+            }
             }
 
             auto replacedDmn = newList.GetMNByCollateral(dmn->collateralOutpoint);
@@ -1116,10 +1125,17 @@ bool CDeterministicMNManager::IsProTxWithCollateral(const CTransactionRef& tx, u
         return false;
     }
 
-    const CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount;
 
-    if (tx->vout[n].nValue != expectedCollateral) {
-        return false;
+    if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+    const CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount2;
+       if (tx->vout[n].nValue != expectedCollateral) {
+          return false;
+       }
+    } else {
+    const CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount;
+       if (tx->vout[n].nValue != expectedCollateral) {
+          return false;
+       }
     }
     return true;
 }
@@ -1391,9 +1407,43 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
     CTxDestination collateralTxDest;
     const PKHash *keyForPayloadSig = nullptr;
     COutPoint collateralOutpoint;
+    int nHeight = pindexPrev->nHeight + 1;
+  if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+    CAmount expectedCollateral = GetMnType(ptx.nType).collat_amount2;
+  if (!ptx.collateralOutpoint.hash.IsNull()) {
+        Coin coin;
+        if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
+        }
 
+        if (!ExtractDestination(coin.out.scriptPubKey, collateralTxDest)) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-dest");
+        }
+
+        // Extract key from collateral. This only works for P2PK and P2PKH collaterals and will fail for P2SH.
+        // Issuer of this ProRegTx must prove ownership with this key by signing the ProRegTx
+        keyForPayloadSig = std::get_if<PKHash>(&collateralTxDest);
+        if (!keyForPayloadSig) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-pkh");
+        }
+
+        collateralOutpoint = ptx.collateralOutpoint;
+    } else {
+        if (ptx.collateralOutpoint.n >= tx.vout.size()) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-index");
+        }
+        if (tx.vout[ptx.collateralOutpoint.n].nValue != expectedCollateral) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
+        }
+
+        if (!ExtractDestination(tx.vout[ptx.collateralOutpoint.n].scriptPubKey, collateralTxDest)) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-dest");
+        }
+
+        collateralOutpoint = COutPoint(tx.GetHash(), ptx.collateralOutpoint.n);
+    }
+    } else {
     CAmount expectedCollateral = GetMnType(ptx.nType).collat_amount;
-
     if (!ptx.collateralOutpoint.hash.IsNull()) {
         Coin coin;
         if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral) {
@@ -1426,6 +1476,8 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
 
         collateralOutpoint = COutPoint(tx.GetHash(), ptx.collateralOutpoint.n);
     }
+   }
+
 
     // don't allow reuse of collateral key for other keys (don't allow people to put the collateral key onto an online server)
     // this check applies to internal and external collateral, but internal collaterals are not necessarily a P2PKH

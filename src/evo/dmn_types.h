@@ -26,17 +26,19 @@ struct mntype_struct
 {
     const int32_t voting_weight;
     const CAmount collat_amount;
+    const CAmount collat_amount2;
     const std::string_view description;
 };
 
 constexpr auto Regular = mntype_struct{
     .voting_weight = 1,
     .collat_amount = 1000 * COIN,
+    .collat_amount2 = 1000000 * COIN,
     .description = "Regular",
 };
 constexpr auto HighPerformance = mntype_struct{
     .voting_weight = 4,
-    .collat_amount = 4000 * COIN,
+    .collat_amount = 4000000 * COIN,
     .description = "HighPerformance",
 };
 constexpr auto Invalid = mntype_struct{
@@ -47,7 +49,7 @@ constexpr auto Invalid = mntype_struct{
 
 [[nodiscard]] static constexpr bool IsCollateralAmount(CAmount amount)
 {
-    return amount == Regular.collat_amount ||
+    return amount == Regular.collat_amount || Regular.collat_amount2 ||
         amount == HighPerformance.collat_amount;
 }
 

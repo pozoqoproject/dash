@@ -91,6 +91,7 @@ struct Params {
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and DIP activations. */
     int MinBIP9WarningHeight;
+    int nBlocksPerDay;
     /**
      * Minimum blocks including miner confirmation of the total of nMinerConfirmationWindow blocks in a retargeting period,
      * (nPowTargetTimespan / nPowTargetSpacing) which is also used for BIP9 deployments.
@@ -107,9 +108,15 @@ struct Params {
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
-    int nPowKGWHeight;
-    int nPowDGWHeight;
-    int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+    int64_t nPowTargetTimespanNew;
+    int nPOWR;
+    int64_t DifficultyAdjustmentInterval() const {
+    if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+        return consensus.nPowTargetTimespanNew / consensus.nPowTargetSpacing;
+    } else {
+        return consensus.nPowTargetTimespan / consensus.nPowTargetSpacing;
+    }
+    }
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
 

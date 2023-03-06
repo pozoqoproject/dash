@@ -610,10 +610,15 @@ static UniValue protx_register_common_wrapper(const JSONRPCRequest& request,
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("invalid collaterall address: %s", request.params[paramIdx].get_str()));
         }
         CScript collateralScript = GetScriptForDestination(collateralDest);
-
+         if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+        CAmount fundCollateral = GetMnType(mnType).collat_amount2;
+        CTxOut collateralTxOut(fundCollateral, collateralScript);
+        tx.vout.emplace_back(collateralTxOut);
+         } else {
         CAmount fundCollateral = GetMnType(mnType).collat_amount;
         CTxOut collateralTxOut(fundCollateral, collateralScript);
         tx.vout.emplace_back(collateralTxOut);
+         }
 
         paramIdx++;
     } else {
@@ -704,7 +709,21 @@ static UniValue protx_register_common_wrapper(const JSONRPCRequest& request,
         fSubmit = ParseBoolV(request.params[paramIdx + 7], "submit");
     }
 
-    if (isFundRegister) {
+    if (isFundRegister && ::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+        CAmount fundCollateral = GetMnType(mnType).collat_amount2;
+        uint32_t collateralIndex = (uint32_t) -1;
+        for (uint32_t i = 0; i < tx.vout.size(); i++) {
+            if (tx.vout[i].nValue == fundCollateral) {
+                collateralIndex = i;
+                break;
+            }
+        }
+        CHECK_NONFATAL(collateralIndex != (uint32_t) -1);
+        ptx.collateralOutpoint.n = collateralIndex;
+
+        SetTxPayload(tx, ptx);
+        return SignAndSendSpecialTx(request, tx, fSubmit);
+    } else if (isFundRegister && ::ChainActive().Tip()->nHeight < Params().GetConsensus().nPOWR) {
         CAmount fundCollateral = GetMnType(mnType).collat_amount;
         uint32_t collateralIndex = (uint32_t) -1;
         for (uint32_t i = 0; i < tx.vout.size(); i++) {
@@ -718,7 +737,8 @@ static UniValue protx_register_common_wrapper(const JSONRPCRequest& request,
 
         SetTxPayload(tx, ptx);
         return SignAndSendSpecialTx(request, tx, fSubmit);
-    } else {
+
+      } else {
         // referencing external collateral
 
         Coin coin;
