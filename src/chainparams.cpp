@@ -174,13 +174,13 @@ public:
         consensus.BRRHeight = 200; //000005560c210faa9414fa2126d568f707cef76af7a69db3f27dd9e23d146569
         consensus.MinBIP9WarningHeight = 200; // dip8 activation height + miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~uint256(0) >> 20
-        consensus.nPowTargetTimespan =  60; // Dash: 1 minutes
-        consensus.nPowTargetTimespanNew = 30 * 60; // Dash: 30 minutes
-        consensus.nPowTargetSpacing = 60; // Dash: 1 minutes
+        consensus.nPowTargetTimespan =  60; // Pozoqo: 1 minutes
+        consensus.nPowTargetTimespanNew = 30 * 60; // Pozoqo: 30 minutes
+        consensus.nPowTargetSpacing = 60; // Pozoqo: 1 minutes
         consensus.nBlocksPerDay = 1440;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        consensus.nPOWR = 6500;
+        consensus.nPOWR = 7000;
         consensus.nRuleChangeActivationThreshold = 95; // 95% of 2016
         consensus.nMinerConfirmationWindow = 1; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;

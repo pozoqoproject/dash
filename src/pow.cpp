@@ -139,7 +139,7 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
 
     // Limit adjustment step
     int64_t nActualTimespan = pindexLast->GetBlockTime() - nFirstBlockTime;
-     if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+     if (pindexLast->nHeight >= params.nPOWR) {
     if (nActualTimespan < params.nPowTargetTimespanNew/4)
         nActualTimespan = params.nPowTargetTimespanNew/4;
     if (nActualTimespan > params.nPowTargetTimespanNew*4)
@@ -156,14 +156,20 @@ unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nF
         nActualTimespan = params.nPowTargetTimespan/4;
     if (nActualTimespan > params.nPowTargetTimespan*4)
         nActualTimespan = params.nPowTargetTimespan*4;
-
+        
     // Retarget
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
     arith_uint256 bnNew;
     bnNew.SetCompact(pindexLast->nBits);
     bnNew *= nActualTimespan;
     bnNew /= params.nPowTargetTimespan;
-    }
+	}
+    const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+    arith_uint256 bnNew;
+    bnNew.SetCompact(pindexLast->nBits);
+    bnNew *= nActualTimespan;
+    bnNew /= params.nPowTargetTimespan;
+
     if (bnNew > bnPowLimit)
         bnNew = bnPowLimit;
 

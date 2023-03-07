@@ -8,7 +8,6 @@
 
 #include <uint256.h>
 #include <llmq/params.h>
-
 #include <map>
 
 namespace Consensus {
@@ -110,10 +109,10 @@ struct Params {
     int64_t nPowTargetTimespanNew;
     int nPOWR;
     int64_t DifficultyAdjustmentInterval() const {
-    if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
-        return consensus.nPowTargetTimespanNew / consensus.nPowTargetSpacing;
+    if (nPOWR >= 7000) {
+        return nPowTargetTimespanNew / nPowTargetSpacing;
     } else {
-        return consensus.nPowTargetTimespan / consensus.nPowTargetSpacing;
+        return nPowTargetTimespan / nPowTargetSpacing;
     }
     }
     uint256 nMinimumChainWork;
