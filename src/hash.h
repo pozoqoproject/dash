@@ -322,4 +322,5 @@ inline uint256 HashX5(const T1 pbegin, const T1 pend)
     return hash[4].trim256();
 }
 
+
 #endif // BITCOIN_HASH_H

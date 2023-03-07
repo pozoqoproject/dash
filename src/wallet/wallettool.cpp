@@ -56,7 +56,7 @@ static std::shared_ptr<CWallet> MakeWallet(const std::string& name, const fs::pa
     try {
         bool first_run;
         load_wallet_ret = wallet_instance->LoadWallet(first_run);
-    } catch (const std::runtime_error) {
+    } catch (const std::runtime_error&) {
         tfm::format(std::cerr, "Error loading %s. Is wallet being used by another process?\n", name);
         return nullptr;
     }
@@ -119,6 +119,7 @@ bool ExecuteWalletToolFunc(const std::string& command, const std::string& name)
             WalletShowInfo(wallet_instance.get());
             wallet_instance->Close();
         } else if (command == "salvage") {
+#ifdef USE_BDB
             bilingual_str error;
             std::vector<bilingual_str> warnings;
             bool ret = RecoverDatabaseFile(path, error, warnings);
@@ -131,6 +132,10 @@ bool ExecuteWalletToolFunc(const std::string& command, const std::string& name)
                 }
             }
             return ret;
+#else
+            tfm::format(std::cerr, "Salvage command is not available as BDB support is not compiled");
+            return false;
+#endif
         }
     } else {
         tfm::format(std::cerr, "Invalid command: %s\n", command);

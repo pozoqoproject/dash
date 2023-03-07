@@ -129,6 +129,15 @@ void EnsureWalletIsUnlocked(const CWallet* pwallet)
     }
 }
 
+LegacyScriptPubKeyMan& EnsureLegacyScriptPubKeyMan(CWallet& wallet)
+{
+    LegacyScriptPubKeyMan* spk_man = wallet.GetLegacyScriptPubKeyMan();
+    if (!spk_man) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+    }
+    return *spk_man;
+}
+
 WalletContext& EnsureWalletContext(const CoreContext& context)
 {
     auto* wallet_context = GetContext<WalletContext>(context);
@@ -229,7 +238,7 @@ UniValue getnewaddress(const JSONRPCRequest& request)
     return EncodeDestination(dest);
 }
 
-static UniValue getrawchangeaddress(const JSONRPCRequest& request)
+UniValue getrawchangeaddress(const JSONRPCRequest& request)
 {
     RPCHelpMan{"getrawchangeaddress",
         "\nReturns a new Pozoqo address, for receiving change.\n"
@@ -584,15 +593,19 @@ static UniValue signmessage(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
     }
 
-    const CKeyID *keyID = std::get_if<CKeyID>(&dest);
-    if (!keyID) {
+    const PKHash *pkhash = std::get_if<PKHash>(&dest);
+    if (!pkhash) {
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
     }
 
-    const SigningProvider* provider = pwallet->GetSigningProvider();
+    CScript script_pub_key = GetScriptForDestination(*pkhash);
+    const SigningProvider* provider = pwallet->GetSigningProvider(script_pub_key);
+    if (!provider) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
+    }
 
     CKey key;
-    if (!provider->GetKey(*keyID, key)) {
+    if (!provider->GetKey(CKeyID(*pkhash), key)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
     }
 
@@ -828,7 +841,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
                         HELP_REQUIRING_PASSPHRASE,
                 {
                     {"dummy", RPCArg::Type::STR, RPCArg::Optional::NO, "Must be set to \"\" for backwards compatibility.", "\"\""},
-                    {"amounts", RPCArg::Type::OBJ, RPCArg::Optional::NO, "A json object with addresses and amounts",
+                    {"amounts", RPCArg::Type::OBJ, RPCArg::Optional::NO, "The addresses and amounts",
                         {
                             {"address", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The pozoqo address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value"},
                         },
@@ -836,7 +849,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
                     {"minconf", RPCArg::Type::NUM, RPCArg::Optional::OMITTED_NAMED_ARG, "Ignored dummy value"},
                     {"addlocked", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED_NAMED_ARG, "Ignored dummy value"},
                     {"comment", RPCArg::Type::STR, RPCArg::Optional::OMITTED_NAMED_ARG, "A comment"},
-                    {"subtractfeefrom", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "A json array with addresses.\n"
+                    {"subtractfeefrom", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "The addresses.\n"
             "                           The fee will be equally deducted from the amount of each selected address.\n"
             "                           Those recipients will receive less pozoqo than you enter in their corresponding amount field.\n"
             "                           If no addresses are specified here, the sender pays the fee.",
@@ -959,7 +972,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
     return tx->GetHash().GetHex();
 }
 
-static UniValue addmultisigaddress(const JSONRPCRequest& request)
+UniValue addmultisigaddress(const JSONRPCRequest& request)
 {
     RPCHelpMan{"addmultisigaddress",
         "\nAdd a nrequired-to-sign multisignature address to the wallet. Requires a new wallet backup.\n"
@@ -969,7 +982,7 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
         "If 'label' is specified, assign address to that label.\n",
         {
             {"nrequired", RPCArg::Type::NUM, RPCArg::Optional::NO, "The number of required signatures out of the n keys or addresses."},
-            {"keys", RPCArg::Type::ARR, RPCArg::Optional::NO, "A json array of pozoqo addresses or hex-encoded public keys",
+            {"keys", RPCArg::Type::ARR, RPCArg::Optional::NO, "The pozoqo addresses or hex-encoded public keys",
                 {
                     {"key", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "pozoqo address or hex-encoded public key"},
                 },
@@ -995,10 +1008,7 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
-    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
-    if (!spk_man) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
-    }
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*pwallet);
 
     LOCK(pwallet->cs_wallet);
 
@@ -1021,13 +1031,13 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
 
     // Construct using pay-to-script-hash:
     CScript inner = CreateMultisigRedeemscript(required, pubkeys);
-    CScriptID innerID(inner);
-    spk_man->AddCScript(inner);
+    ScriptHash innerHash(inner);
+    spk_man.AddCScript(inner);
 
-    pwallet->SetAddressBook(innerID, label, "send");
+    pwallet->SetAddressBook(innerHash, label, "send");
 
     UniValue result(UniValue::VOBJ);
-    result.pushKV("address", EncodeDestination(innerID));
+    result.pushKV("address", EncodeDestination(innerHash));
     result.pushKV("redeemScript", HexStr(inner));
     return result;
 }
@@ -1831,7 +1841,7 @@ static UniValue keypoolrefill(const JSONRPCRequest& request)
         "\nFills the keypool."+
                 HELP_REQUIRING_PASSPHRASE,
         {
-            {"newsize", RPCArg::Type::NUM, /* default */ itostr(DEFAULT_KEYPOOL_SIZE), "The new keypool size"},
+            {"newsize", RPCArg::Type::NUM, /* default */ ToString(DEFAULT_KEYPOOL_SIZE), "The new keypool size"},
         },
         RPCResult{RPCResult::Type::NONE, "", ""},
         RPCExamples{
@@ -2116,7 +2126,7 @@ static UniValue lockunspent(const JSONRPCRequest& request)
         "Also see the listunspent call\n",
         {
             {"unlock", RPCArg::Type::BOOL, RPCArg::Optional::NO, "Whether to unlock (true) or lock (false) the specified transactions"},
-            {"transactions", RPCArg::Type::ARR, /* default */ "empty array", "A json array of objects. Each object the txid (string) vout (numeric).",
+            {"transactions", RPCArg::Type::ARR, /* default */ "empty array", "The transaction outputs and within each, the txid (string) vout (numeric).",
                 {
                     {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
                         {
@@ -2329,8 +2339,8 @@ static UniValue setcoinjoinrounds(const JSONRPCRequest& request)
         "\nSet the number of rounds for CoinJoin.\n",
         {
             {"rounds", RPCArg::Type::NUM, RPCArg::Optional::NO,
-                "The default number of rounds is " + std::to_string(DEFAULT_COINJOIN_ROUNDS) +
-                " Cannot be more than " + std::to_string(MAX_COINJOIN_ROUNDS) + " nor less than " + std::to_string(MIN_COINJOIN_ROUNDS)},
+                "The default number of rounds is " + ToString(DEFAULT_COINJOIN_ROUNDS) +
+                " Cannot be more than " + ToString(MAX_COINJOIN_ROUNDS) + " nor less than " + ToString(MIN_COINJOIN_ROUNDS)},
         },
         RPCResults{},
         RPCExamples{
@@ -2358,8 +2368,8 @@ static UniValue setcoinjoinamount(const JSONRPCRequest& request)
         "\nSet the goal amount in " + CURRENCY_UNIT + " for CoinJoin.\n",
         {
             {"amount", RPCArg::Type::NUM, RPCArg::Optional::NO,
-                "The default amount is " + std::to_string(DEFAULT_COINJOIN_AMOUNT) +
-                " Cannot be more than " + std::to_string(MAX_COINJOIN_AMOUNT) + " nor less than " + std::to_string(MIN_COINJOIN_AMOUNT)},
+                "The default amount is " + ToString(DEFAULT_COINJOIN_AMOUNT) +
+                " Cannot be more than " + ToString(MAX_COINJOIN_AMOUNT) + " nor less than " + ToString(MIN_COINJOIN_AMOUNT)},
         },
         RPCResults{},
         RPCExamples{
@@ -2420,8 +2430,6 @@ static UniValue getbalances(const JSONRPCRequest& request)
     wallet.BlockUntilSyncedToCurrentChain();
 
     LOCK(wallet.cs_wallet);
-
-    UniValue obj(UniValue::VOBJ);
 
     const auto bal = wallet.GetBalance();
     UniValue balances{UniValue::VOBJ};
@@ -2588,7 +2596,7 @@ static UniValue listwalletdir(const JSONRPCRequest& request)
     }.Check(request);
 
     UniValue wallets(UniValue::VARR);
-    for (const auto& path : ListWalletDir()) {
+    for (const auto& path : ListDatabases(GetWalletDir())) {
         UniValue wallet(UniValue::VOBJ);
         wallet.pushKV("name", path.string());
         wallets.push_back(wallet);
@@ -2740,7 +2748,7 @@ static UniValue loadwallet(const JSONRPCRequest& request)
     RPCHelpMan{"loadwallet",
         "\nLoads a wallet from a wallet file or directory."
         "\nNote that all wallet command-line options used when starting pozoqod will be"
-        "\napplied to the new wallet (eg -upgradewallet, rescan, etc).\n",
+        "\napplied to the new wallet (eg, rescan, etc).\n",
         {
             {"filename", RPCArg::Type::STR, RPCArg::Optional::NO, "The wallet directory or .dat file."},
             {"load_on_startup", RPCArg::Type::BOOL, /* default */ "null", "Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged."},
@@ -2979,7 +2987,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
         {
             {"minconf", RPCArg::Type::NUM, /* default */ "1", "The minimum confirmations to filter"},
             {"maxconf", RPCArg::Type::NUM, /* default */ "9999999", "The maximum confirmations to filter"},
-            {"addresses", RPCArg::Type::ARR, /* default */ "empty array", "A json array of pozoqo addresses to filter",
+            {"addresses", RPCArg::Type::ARR, /* default */ "empty array", "The pozoqo addresses to filter",
                 {
                     {"address", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "pozoqo address"},
                 },
@@ -3133,7 +3141,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
         CTxDestination address;
         const CScript& scriptPubKey = out.tx->tx->vout[out.i].scriptPubKey;
         bool fValidAddress = ExtractDestination(scriptPubKey, address);
-        bool reused = avoid_reuse && pwallet->IsSpentKey(address);
+        bool reused = avoid_reuse && pwallet->IsSpentKey(out.tx->GetHash(), out.i);
 
         if (destinations.size() && (!fValidAddress || !destinations.count(address)))
             continue;
@@ -3150,12 +3158,14 @@ static UniValue listunspent(const JSONRPCRequest& request)
                 entry.pushKV("label", i->second.name);
             }
 
-            const SigningProvider* provider = pwallet->GetSigningProvider();
-            if (scriptPubKey.IsPayToScriptHash()) {
-                const CScriptID& hash = CScriptID(std::get<CScriptID>(address));
-                CScript redeemScript;
-                if (provider->GetCScript(hash, redeemScript)) {
-                    entry.pushKV("redeemScript", HexStr(redeemScript));
+            const SigningProvider* provider = pwallet->GetSigningProvider(scriptPubKey);
+            if (provider) {
+                if (scriptPubKey.IsPayToScriptHash()) {
+                    const CScriptID& hash = CScriptID(std::get<ScriptHash>(address));
+                    CScript redeemScript;
+                    if (provider->GetCScript(hash, redeemScript)) {
+                        entry.pushKV("redeemScript", HexStr(redeemScript));
+                    }
                 }
             }
         }
@@ -3166,8 +3176,11 @@ static UniValue listunspent(const JSONRPCRequest& request)
         entry.pushKV("spendable", out.fSpendable);
         entry.pushKV("solvable", out.fSolvable);
         if (out.fSolvable) {
-            auto descriptor = InferDescriptor(scriptPubKey, *pwallet->GetLegacyScriptPubKeyMan());
-            entry.pushKV("desc", descriptor->ToString());
+            const SigningProvider* provider = pwallet->GetSigningProvider(scriptPubKey);
+            if (provider) {
+                auto descriptor = InferDescriptor(scriptPubKey, *provider);
+                entry.pushKV("desc", descriptor->ToString());
+            }
         }
         if (avoid_reuse) entry.pushKV("reused", reused);
         entry.pushKV("safe", out.fSafe);
@@ -3305,7 +3318,7 @@ static UniValue fundrawtransaction(const JSONRPCRequest& request)
                                                           "e.g. with 'importpubkey' or 'importmulti' with the 'pubkeys' or 'desc' field."},
                             {"lockUnspents", RPCArg::Type::BOOL, /* default */ "false", "Lock selected unspent outputs"},
                             {"feeRate", RPCArg::Type::AMOUNT, /* default */ "not set: makes wallet determine the fee", "Set a specific fee rate in " + CURRENCY_UNIT + "/kB"},
-                            {"subtractFeeFromOutputs", RPCArg::Type::ARR, /* default */ "empty array", "A json array of integers.\n"
+                            {"subtractFeeFromOutputs", RPCArg::Type::ARR, /* default */ "empty array", "The integers.\n"
                             "                              The fee will be equally deducted from the amount of each specified output.\n"
                             "                              Those recipients will receive less pozoqo than you enter in their corresponding amount field.\n"
                             "                              If no outputs are specified here, the sender pays the fee.",
@@ -3374,7 +3387,7 @@ UniValue signrawtransactionwithwallet(const JSONRPCRequest& request)
                 HELP_REQUIRING_PASSPHRASE,
         {
             {"hexstring", RPCArg::Type::STR, RPCArg::Optional::NO, "The transaction hex string"},
-            {"prevtxs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "A json array of previous dependent transaction outputs",
+            {"prevtxs", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "The previous dependent transaction outputs",
                 {
                     {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
                         {
@@ -3444,9 +3457,23 @@ UniValue signrawtransactionwithwallet(const JSONRPCRequest& request)
     // Parse the prevtxs array
     ParsePrevouts(request.params[1], nullptr, coins);
 
+    std::set<const SigningProvider*> providers;
+    for (const std::pair<COutPoint, Coin> coin_pair : coins) {
+        const SigningProvider* provider = pwallet->GetSigningProvider(coin_pair.second.out.scriptPubKey);
+        if (provider) {
+            providers.insert(std::move(provider));
+        }
+    }
+    if (providers.size() == 0) {
+        // When there are no available providers, use DUMMY_SIGNING_PROVIDER so we can check if the tx is complete
+        providers.insert(&DUMMY_SIGNING_PROVIDER);
+    }
+
     UniValue result(UniValue::VOBJ);
-    SignTransaction(mtx, &*pwallet->GetLegacyScriptPubKeyMan(), coins, request.params[2], result);
-    return result;
+    for (const SigningProvider* provider : providers) {
+        SignTransaction(mtx, provider, coins, request.params[2], result);
+    }
+     return result;
 }
 
 static UniValue rescanblockchain(const JSONRPCRequest& request)
@@ -3546,7 +3573,8 @@ public:
 
     UniValue operator()(const CNoDestination &dest) const { return UniValue(UniValue::VOBJ); }
 
-    UniValue operator()(const CKeyID &keyID) const {
+    UniValue operator()(const PKHash& pkhash) const {
+        CKeyID keyID(pkhash);
         UniValue obj(UniValue::VOBJ);
         CPubKey vchPubKey;
         if (provider && provider->GetPubKey(keyID, vchPubKey)) {
@@ -3556,23 +3584,29 @@ public:
         return obj;
     }
 
-    UniValue operator()(const CScriptID &scriptID) const {
+    UniValue operator()(const ScriptHash& scriptHash) const {
+        CScriptID scriptID(scriptHash);
         UniValue obj(UniValue::VOBJ);
         CScript subscript;
         if (provider && provider->GetCScript(scriptID, subscript)) {
-            std::vector<CTxDestination> addresses;
-            txnouttype whichType;
-            int nRequired;
-            ExtractDestinations(subscript, whichType, addresses, nRequired);
+            // Always present: script type and redeemscript
+            std::vector<std::vector<unsigned char>> solutions_data;
+            TxoutType whichType = Solver(subscript, solutions_data);
             obj.pushKV("script", GetTxnOutputType(whichType));
             obj.pushKV("hex", HexStr(subscript));
-            UniValue a(UniValue::VARR);
-            for (const CTxDestination& addr : addresses) {
-                a.push_back(EncodeDestination(addr));
+            if (whichType == TxoutType::MULTISIG) {
+                // Also report some information on multisig scripts (which do not have a corresponding address).
+                UniValue pubkeys(UniValue::VARR);
+                UniValue addresses(UniValue::VARR);
+                for (size_t i = 1; i < solutions_data.size() - 1; ++i) {
+                    CPubKey pubkey(solutions_data[i]);
+                    pubkeys.push_back(HexStr(pubkey));
+                    addresses.push_back(EncodeDestination(PKHash(pubkey)));
+                }
+                obj.pushKV("pubkeys", std::move(pubkeys));
+                obj.pushKV("addresses", std::move(addresses));
+                obj.pushKV("sigsrequired", solutions_data[0][0]);
             }
-            obj.pushKV("addresses", a);
-            if (whichType == TX_MULTISIG)
-                obj.pushKV("sigsrequired", nRequired);
         }
         return obj;
     }
@@ -3582,9 +3616,10 @@ static UniValue DescribeWalletAddress(CWallet* pwallet, const CTxDestination& de
 {
     UniValue ret(UniValue::VOBJ);
     UniValue detail = DescribeAddress(dest);
+    CScript script = GetScriptForDestination(dest);
     const SigningProvider* provider = nullptr;
     if (pwallet) {
-        provider = pwallet->GetSigningProvider();
+        provider = pwallet->GetSigningProvider(script);
     }
     ret.pushKVs(detail);
     ret.pushKVs(std::visit(DescribeWalletAddressVisitor(provider), dest));
@@ -3626,6 +3661,10 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
                 {RPCResult::Type::ARR, "pubkeys", /* optional */ true, "Array of pubkeys associated with the known redeemscript (only if \"script\" is \"multisig\").",
                 {
                     {RPCResult::Type::STR, "pubkey", ""},
+                }},
+                {RPCResult::Type::ARR, "addresses", /* optional */ true, "Array of addresses associated with the known redeemscript (only if \"script\" is \"multisig\").",
+                {
+                    {RPCResult::Type::STR, "address", ""},
                 }},
                 {RPCResult::Type::NUM, "sigsrequired", /* optional */ true, "The number of signatures required to spend multisig output (only if \"script\" is \"multisig\")."},
                 {RPCResult::Type::STR_HEX, "pubkey", /* optional */ true, "The hex value of the raw public key, for single-key addresses."},
@@ -3672,11 +3711,11 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
 
     CScript scriptPubKey = GetScriptForDestination(dest);
     ret.pushKV("scriptPubKey", HexStr(scriptPubKey));
-    const SigningProvider* provider = pwallet->GetSigningProvider();
+    const SigningProvider* provider = pwallet->GetSigningProvider(scriptPubKey);
 
     isminetype mine = pwallet->IsMine(dest);
     ret.pushKV("ismine", bool(mine & ISMINE_SPENDABLE));
-    bool solvable = IsSolvable(*provider, scriptPubKey);
+    bool solvable = provider && IsSolvable(*provider, scriptPubKey);
     ret.pushKV("solvable", solvable);
     if (solvable) {
         ret.pushKV("desc", InferDescriptor(scriptPubKey, *provider)->ToString());
@@ -3688,24 +3727,18 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
         ret.pushKV("label", pwallet->mapAddressBook[dest].name);
     }
     ret.pushKV("ischange", pwallet->IsChange(scriptPubKey));
-    ScriptPubKeyMan* spk_man = pwallet->GetScriptPubKeyMan();
+
+    ScriptPubKeyMan* spk_man = pwallet->GetScriptPubKeyMan(scriptPubKey);
     if (spk_man) {
-        const CKeyID *key_id = std::get_if<CKeyID>(&dest);
-        const CKeyMetadata* meta = nullptr;
-        if (key_id != nullptr && !key_id->IsNull()) {
-            meta = spk_man->GetMetadata(*key_id);
-        }
-        if (!meta) {
-            meta = spk_man->GetMetadata(CScriptID(scriptPubKey));
-        }
-        if (meta) {
+        const PKHash *pkhash = std::get_if<PKHash>(&dest);
+        if (const CKeyMetadata* meta = spk_man->GetMetadata(dest)) {
             ret.pushKV("timestamp", meta->nCreateTime);
             CHDChain hdChainCurrent;
             LegacyScriptPubKeyMan* legacy_spk_man = pwallet->GetLegacyScriptPubKeyMan();
             if (legacy_spk_man != nullptr) {
                 LOCK(pwallet->cs_KeyStore);
                 AssertLockHeld(legacy_spk_man->cs_KeyStore);
-                if (key_id && pwallet->mapHdPubKeys.count(*key_id) && legacy_spk_man->GetHDChain(hdChainCurrent)) {
+                if (pkhash && pwallet->mapHdPubKeys.count(CKeyID(*pkhash)) && legacy_spk_man->GetHDChain(hdChainCurrent)) {
                     ret.pushKV("hdchainid", hdChainCurrent.GetID().GetHex());
                 }
             }
@@ -3924,7 +3957,7 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
         "\nCreates and funds a transaction in the Partially Signed Transaction format. Inputs will be added if supplied inputs are not enough\n"
         "Implements the Creator and Updater roles.\n",
         {
-            {"inputs", RPCArg::Type::ARR, RPCArg::Optional::NO, "A json array of json objects",
+            {"inputs", RPCArg::Type::ARR, RPCArg::Optional::NO, "The inputs",
                 {
                     {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "",
                         {
@@ -3935,7 +3968,7 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
                     },
                 },
             },
-            {"outputs", RPCArg::Type::ARR, RPCArg::Optional::NO, "a json array with outputs (key-value pairs), where none of the keys are duplicated.\n"
+            {"outputs", RPCArg::Type::ARR, RPCArg::Optional::NO, "The outputs (key-value pairs), where none of the keys are duplicated.\n"
                     "That is, each address can only appear once and there can only be one 'data' object.\n"
                     "For compatibility reasons, a dictionary, which holds the key-value pairs directly, is also\n"
                     "                             accepted as second parameter.",
@@ -3960,7 +3993,7 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
                     {"includeWatching", RPCArg::Type::BOOL, /* default */ "true for watch-only wallets, otherwise false", "Also select inputs which are watch only"},
                     {"lockUnspents", RPCArg::Type::BOOL, /* default */ "false", "Lock selected unspent outputs"},
                     {"feeRate", RPCArg::Type::AMOUNT, /* default */ "not set: makes wallet determine the fee", "Set a specific fee rate in " + CURRENCY_UNIT + "/kB"},
-                    {"subtractFeeFromOutputs", RPCArg::Type::ARR, /* default */ "empty array", "A json array of integers.\n"
+                    {"subtractFeeFromOutputs", RPCArg::Type::ARR, /* default */ "empty array", "The outputs to subtract the fee from.\n"
                     "                              The fee will be equally deducted from the amount of each specified output.\n"
                     "                              Those recipients will receive less Pozoqo than you enter in their corresponding amount field.\n"
                     "                              If no outputs are specified here, the sender pays the fee.",
@@ -4031,6 +4064,42 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
     return result;
 }
 
+static UniValue upgradewallet(const JSONRPCRequest& request)
+{
+    RPCHelpMan{"upgradewallet",
+        "\nUpgrade the wallet. Upgrades to the latest version if no version number is specified\n"
+        "New keys may be generated and a new wallet backup will need to be made.",
+        {
+            {"version", RPCArg::Type::NUM, /* default */ strprintf("%d", FEATURE_LATEST), "The version number to upgrade to. Default is the latest wallet version"}
+        },
+        RPCResults{},
+        RPCExamples{
+            HelpExampleCli("upgradewallet", "120200")
+            + HelpExampleRpc("upgradewallet", "120200")
+        }
+    }.Check(request);
+
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    if (!wallet) return NullUniValue;
+    CWallet* const pwallet = wallet.get();
+
+    RPCTypeCheck(request.params, {UniValue::VNUM}, true);
+
+    EnsureWalletIsUnlocked(pwallet);
+
+    int version = 0;
+    if (!request.params[0].isNull()) {
+        version = request.params[0].get_int();
+    }
+
+    bilingual_str error;
+    std::vector<bilingual_str> warnings;
+    if (!pwallet->UpgradeWallet(version, error, warnings)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, error.original);
+    }
+    return error.original;
+}
+
 // clang-format off
 static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           argNames
@@ -4090,6 +4159,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "signmessage",                      &signmessage,                   {"address","message"} },
     { "wallet",             "signrawtransactionwithwallet",     &signrawtransactionwithwallet,  {"hexstring","prevtxs","sighashtype"} },
     { "wallet",             "unloadwallet",                     &unloadwallet,                  {"wallet_name", "load_on_startup"} },
+    { "wallet",             "upgradewallet",                    &upgradewallet,                 {"version"} },
     { "wallet",             "upgradetohd",                      &upgradetohd,                   {"mnemonic", "mnemonicpassphrase", "walletpassphrase", "rescan"} },
     { "wallet",             "walletlock",                       &walletlock,                    {} },
     { "wallet",             "walletpassphrasechange",           &walletpassphrasechange,        {"oldpassphrase","newpassphrase"} },

@@ -12,14 +12,13 @@
 #include <node/context.h>
 #include <pubkey.h>
 #include <random.h>
-#include <scheduler.h>
 #include <txdb.h>
 #include <txmempool.h>
 #include <util/check.h>
+#include <util/string.h>
 
 #include <type_traits>
-
-#include <boost/thread.hpp>
+#include <vector>
 
 /** This is connected to the logger. Can be used to redirect logs to any other log */
 extern const std::function<void(const std::string&)> G_TEST_LOG_FUN;
@@ -89,7 +88,6 @@ private:
  * initialization behaviour.
  */
 struct ChainTestingSetup : public BasicTestingSetup {
-    boost::thread_group threadGroup;
 
     explicit ChainTestingSetup(const std::string& chainName = CBaseChainParams::MAIN, const std::vector<const char*>& extra_args = {});
     ~ChainTestingSetup();
@@ -142,6 +140,11 @@ struct TestChain100Setup : public TestChainSetup {
 struct TestChainDIP3Setup : public TestChainSetup
 {
     TestChainDIP3Setup() : TestChainSetup(431) {}
+};
+
+struct TestChainDIP3V19Setup : public TestChainSetup
+{
+    TestChainDIP3V19Setup() : TestChainSetup(1000) {}
 };
 
 struct TestChainDIP3BeforeActivationSetup : public TestChainSetup

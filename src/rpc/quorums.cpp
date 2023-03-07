@@ -189,6 +189,17 @@ static UniValue BuildQuorumInfo(const llmq::CQuorumCPtr& quorum, bool includeMem
     ret.pushKV("quorumIndex", quorum->qc->quorumIndex);
     ret.pushKV("minedBlock", quorum->minedBlockHash.ToString());
 
+    if (quorum->params.useRotation) {
+        auto previousActiveCommitment = llmq::quorumBlockProcessor->GetLastMinedCommitmentsByQuorumIndexUntilBlock(quorum->params.type, quorum->m_quorum_base_block_index, quorum->qc->quorumIndex, 0);
+        if (previousActiveCommitment.has_value()) {
+            int previousConsecutiveDKGFailures = (quorum->m_quorum_base_block_index->nHeight - previousActiveCommitment.value()->nHeight) /  quorum->params.dkgInterval - 1;
+            ret.pushKV("previousConsecutiveDKGFailures", previousConsecutiveDKGFailures);
+        }
+        else {
+            ret.pushKV("previousConsecutiveDKGFailures", 0);
+        }
+    }
+
     if (includeMembers) {
         UniValue membersArr(UniValue::VARR);
         for (size_t i = 0; i < quorum->members.size(); i++) {
@@ -284,9 +295,9 @@ static UniValue quorum_dkgstatus(const JSONRPCRequest& request)
     for (const auto& type : llmq::utils::GetEnabledQuorumTypes(pindexTip)) {
         const auto& llmq_params = llmq::GetLLMQParams(type);
         bool rotation_enabled = llmq::utils::IsQuorumRotationEnabled(type, pindexTip);
-        size_t quorums_num = rotation_enabled ? llmq_params.signingActiveQuorumCount : 1;
+        int quorums_num = rotation_enabled ? llmq_params.signingActiveQuorumCount : 1;
 
-        for (int quorumIndex = 0; quorumIndex < quorums_num; ++quorumIndex) {
+        for (const int quorumIndex : irange::range(quorums_num)) {
             UniValue obj(UniValue::VOBJ);
             obj.pushKV("llmqType", std::string(llmq_params.name));
             obj.pushKV("quorumIndex", quorumIndex);

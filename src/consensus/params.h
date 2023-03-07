@@ -8,7 +8,6 @@
 
 #include <uint256.h>
 #include <llmq/params.h>
-
 #include <map>
 
 namespace Consensus {
@@ -23,6 +22,7 @@ enum DeploymentPos {
     DEPLOYMENT_REALLOC, // Deployment of Block Reward Reallocation
     DEPLOYMENT_DIP0020, // Deployment of DIP0020, DIP0021 and LMQ_100_67 quorums
     DEPLOYMENT_DIP0024, // Deployment of DIP0024 (Quorum Rotation) and decreased governance proposal fee
+    DEPLOYMENT_V19,     // Deployment of Basic BLS, AssetLocks, EHF
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -89,6 +89,7 @@ struct Params {
     /** Don't warn about unknown BIP 9 activations below this height.
      * This prevents us from warning about the CSV and DIP activations. */
     int MinBIP9WarningHeight;
+    int nBlocksPerDay;
     /**
      * Minimum blocks including miner confirmation of the total of nMinerConfirmationWindow blocks in a retargeting period,
      * (nPowTargetTimespan / nPowTargetSpacing) which is also used for BIP9 deployments.
@@ -105,9 +106,15 @@ struct Params {
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
-    int nPowKGWHeight;
-    int nPowDGWHeight;
-    int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+    int64_t nPowTargetTimespanNew;
+    int nPOWR;
+    int64_t DifficultyAdjustmentInterval() const {
+    if (nPOWR >= 8000) {
+        return nPowTargetTimespanNew / nPowTargetSpacing;
+    } else {
+        return nPowTargetTimespan / nPowTargetSpacing;
+    }
+    }
     uint256 nMinimumChainWork;
     uint256 defaultAssumeValid;
 

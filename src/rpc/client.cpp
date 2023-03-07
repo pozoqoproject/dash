@@ -28,6 +28,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
 {
     { "setmocktime", 0, "timestamp" },
     { "mockscheduler", 0, "delta_time" },
+    { "utxoupdatepsbt", 1, "descriptors" },
 #if ENABLE_MINER
     { "generatetoaddress", 0, "nblocks" },
     { "generatetoaddress", 2, "maxtries" },
@@ -111,12 +112,10 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "signrawtransactionwithkey", 1, "privkeys" },
     { "signrawtransactionwithkey", 2, "prevtxs" },
     { "signrawtransactionwithwallet", 1, "prevtxs" },
-    { "sendrawtransaction", 1, "allowhighfees" },
     { "sendrawtransaction", 1, "maxfeerate" },
     { "sendrawtransaction", 2, "instantsend" },
     { "sendrawtransaction", 3, "bypasslimits" },
     { "testmempoolaccept", 0, "rawtxs" },
-    { "testmempoolaccept", 1, "allowhighfees" },
     { "testmempoolaccept", 1, "maxfeerate" },
     { "combinerawtransaction", 0, "txs" },
     { "fundrawtransaction", 1, "options" },
@@ -183,6 +182,7 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "getspecialtxes", 3, "skip" },
     { "getspecialtxes", 4, "verbosity" },
     { "disconnectnode", 1, "nodeid" },
+    { "upgradewallet", 0, "version" },
     // Echo with conversion (For testing only)
     { "echojson", 0, "arg0" },
     { "echojson", 1, "arg1" },

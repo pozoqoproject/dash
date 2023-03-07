@@ -581,7 +581,7 @@ void BitcoinGUI::createMenuBar()
     connect(minimize_action, &QAction::triggered, [] {
         QApplication::activeWindow()->showMinimized();
     });
-    connect(qApp, &QApplication::focusWindowChanged, [minimize_action] (QWindow* window) {
+    connect(qApp, &QApplication::focusWindowChanged, this, [minimize_action] (QWindow* window) {
         minimize_action->setEnabled(window != nullptr && (window->flags() & Qt::Dialog) != Qt::Dialog && window->windowState() != Qt::WindowMinimized);
     });
 
@@ -596,7 +596,7 @@ void BitcoinGUI::createMenuBar()
         }
     });
 
-    connect(qApp, &QApplication::focusWindowChanged, [zoom_action] (QWindow* window) {
+    connect(qApp, &QApplication::focusWindowChanged, this, [zoom_action] (QWindow* window) {
         zoom_action->setEnabled(window != nullptr);
     });
 #endif
@@ -870,6 +870,11 @@ void BitcoinGUI::setWalletController(WalletController* wallet_controller)
     }
 }
 
+WalletController* BitcoinGUI::getWalletController()
+{
+    return m_wallet_controller;
+}
+
 void BitcoinGUI::addWallet(WalletModel* walletModel)
 {
     if (!walletFrame) return;
@@ -934,7 +939,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
 {
 #ifdef ENABLE_WALLET
     if (walletFrame != nullptr) {
-        overviewButton->setEnabled(enabled);
+        // NOTE: overviewButton is always enabled
         sendCoinsButton->setEnabled(enabled);
         coinJoinCoinsButton->setEnabled(enabled && clientModel->coinJoinOptions().isEnabled());
         receiveCoinsButton->setEnabled(enabled);

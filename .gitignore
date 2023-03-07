@@ -11,7 +11,7 @@ src/pozoqod
 src/pozoqo-cli
 src/pozoqo-tx
 src/pozoqo-wallet
-src/test/fuzz
+src/test/fuzz/*
 !src/test/fuzz/*.*
 src/test/test_pozoqo
 src/qt/test/test_pozoqo-qt

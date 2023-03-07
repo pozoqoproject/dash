@@ -32,11 +32,13 @@
 #include <rpc/blockchain.h>
 #include <rpc/register.h>
 #include <rpc/server.h>
+#include <scheduler.h>
 #include <script/sigcache.h>
 #include <streams.h>
 #include <spork.h>
 #include <txdb.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 #include <util/time.h>
 #include <util/translation.h>
 #include <util/vector.h>
@@ -56,6 +58,8 @@
 #include <evo/deterministicmns.h>
 #include <evo/evodb.h>
 #include <evo/specialtx.h>
+
+#include <memory>
 
 const std::function<std::string(const char*)> G_TRANSLATION_FUN = nullptr;
 
@@ -129,15 +133,16 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::ve
     m_node.chain = interfaces::MakeChain(m_node);
     g_wallet_init_interface.Construct(m_node);
     fCheckBlockIndex = true;
-    evoDb.reset(new CEvoDB(1 << 20, true, true));
+    m_node.evodb = std::make_unique<CEvoDB>(1 << 20, true, true);
     connman = std::make_unique<CConnman>(0x1337, 0x1337);
-    deterministicMNManager.reset(new CDeterministicMNManager(*evoDb, *connman));
-    llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*evoDb));
+    deterministicMNManager.reset(new CDeterministicMNManager(*m_node.evodb, *connman));
+    llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*m_node.evodb));
     static bool noui_connected = false;
     if (!noui_connected) {
         noui_connect();
         noui_connected = true;
     }
+    bls::bls_legacy_scheme.store(true);
 }
 
 BasicTestingSetup::~BasicTestingSetup()
@@ -145,7 +150,7 @@ BasicTestingSetup::~BasicTestingSetup()
     connman.reset();
     llmq::quorumSnapshotManager.reset();
     deterministicMNManager.reset();
-    evoDb.reset();
+    m_node.evodb.reset();
 
     LogInstance().DisconnectTestLogger();
     fs::remove_all(m_path_root);
@@ -159,27 +164,28 @@ ChainTestingSetup::ChainTestingSetup(const std::string& chainName, const std::ve
     // We have to run a scheduler thread to prevent ActivateBestChain
     // from blocking due to queue overrun.
     m_node.scheduler = std::make_unique<CScheduler>();
-    threadGroup.create_thread([&] { TraceThread("scheduler", [&] { m_node.scheduler->serviceQueue(); }); });
+    m_node.scheduler->m_service_thread = std::thread([&] { TraceThread("scheduler", [&] { m_node.scheduler->serviceQueue(); }); });
     GetMainSignals().RegisterBackgroundSignalScheduler(*m_node.scheduler);
 
     pblocktree.reset(new CBlockTreeDB(1 << 20, true));
 
+    m_node.mempool = std::make_unique<CTxMemPool>(&::feeEstimator);
+    m_node.mempool->setSanityCheck(1.0);
+
     m_node.chainman = &::g_chainman;
 
-    m_node.mempool = &::mempool;
-    m_node.mempool->setSanityCheck(1.0);
     m_node.connman = std::make_unique<CConnman>(0x1337, 0x1337); // Deterministic randomness for tests.
 
     ::sporkManager = std::make_unique<CSporkManager>();
     ::governance = std::make_unique<CGovernanceManager>();
     ::masternodeSync = std::make_unique<CMasternodeSync>(*m_node.connman);
-    ::coinJoinServer = std::make_unique<CCoinJoinServer>(*m_node.connman);
+    ::coinJoinServer = std::make_unique<CCoinJoinServer>(*m_node.mempool, *m_node.connman, ::masternodeSync);
 #ifdef ENABLE_WALLET
-    ::coinJoinClientQueueManager = std::make_unique<CCoinJoinClientQueueManager>(*m_node.connman);
+    ::coinJoinClientQueueManager = std::make_unique<CCoinJoinClientQueueManager>(*m_node.connman, ::masternodeSync);
 #endif // ENABLE_WALLET
 
-    deterministicMNManager.reset(new CDeterministicMNManager(*evoDb, *m_node.connman));
-    m_node.llmq_ctx = std::make_unique<LLMQContext>(*evoDb, *m_node.mempool, *m_node.connman, *sporkManager, true, false);
+    deterministicMNManager.reset(new CDeterministicMNManager(*m_node.evodb, *m_node.connman));
+    m_node.llmq_ctx = std::make_unique<LLMQContext>(*m_node.evodb, *m_node.mempool, *m_node.connman, *sporkManager, true, false);
 
     // Start script-checking threads. Set g_parallel_script_checks to true so they are used.
     constexpr int script_check_threads = 2;
@@ -193,8 +199,6 @@ ChainTestingSetup::~ChainTestingSetup()
     deterministicMNManager.reset();
     m_node.llmq_ctx->Interrupt();
     m_node.llmq_ctx->Stop();
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
     StopScriptCheckWorkerThreads();
     GetMainSignals().FlushBackgroundCallbacks();
     GetMainSignals().UnregisterBackgroundSignalScheduler();
@@ -207,8 +211,8 @@ ChainTestingSetup::~ChainTestingSetup()
     ::sporkManager.reset();
     m_node.connman.reset();
     m_node.banman.reset();
-    UnloadBlockIndex(m_node.mempool);
-    m_node.mempool = nullptr;
+    UnloadBlockIndex(m_node.mempool.get());
+    m_node.mempool.reset();
     m_node.args = nullptr;
     m_node.scheduler.reset();
     m_node.llmq_ctx.reset();
@@ -225,7 +229,7 @@ TestingSetup::TestingSetup(const std::string& chainName, const std::vector<const
     // instead of unit tests, but for now we need these here.
     RegisterAllCoreRPCCommands(tableRPC);
 
-    m_node.chainman->InitializeChainstate(llmq::chainLocksHandler, llmq::quorumInstantSendManager, llmq::quorumBlockProcessor);
+    m_node.chainman->InitializeChainstate(llmq::chainLocksHandler, llmq::quorumInstantSendManager, llmq::quorumBlockProcessor, m_node.evodb, *m_node.mempool);
     ::ChainstateActive().InitCoinsDB(
         /* cache_size_bytes */ 1 << 23, /* in_memory */ true, /* should_wipe */ false);
     assert(!::ChainstateActive().CanFlushToDisk());
@@ -237,7 +241,7 @@ TestingSetup::TestingSetup(const std::string& chainName, const std::vector<const
 
     m_node.banman = std::make_unique<BanMan>(GetDataDir() / "banlist.dat", nullptr, DEFAULT_MISBEHAVING_BANTIME);
     m_node.peer_logic = std::make_unique<PeerLogicValidation>(
-        m_node.connman.get(), m_node.banman.get(), *m_node.scheduler, *m_node.chainman, *m_node.mempool, m_node.llmq_ctx, false
+        *m_node.connman, m_node.banman.get(), *m_node.scheduler, *m_node.chainman, *m_node.mempool, m_node.llmq_ctx
     );
     {
         CConnman::Options options;
@@ -303,7 +307,7 @@ CBlock TestChainSetup::CreateAndProcessBlock(const std::vector<CMutableTransacti
 CBlock TestChainSetup::CreateBlock(const std::vector<CMutableTransaction>& txns, const CScript& scriptPubKey)
 {
     const CChainParams& chainparams = Params();
-    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler(*sporkManager, *governance, *m_node.llmq_ctx->quorum_block_processor, *m_node.llmq_ctx->clhandler, *m_node.llmq_ctx->isman, *m_node.mempool, chainparams).CreateNewBlock(scriptPubKey);
+    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler(*sporkManager, *governance, *m_node.llmq_ctx->quorum_block_processor, *m_node.llmq_ctx->clhandler, *m_node.llmq_ctx->isman, *m_node.evodb, *m_node.mempool, chainparams).CreateNewBlock(scriptPubKey);
     CBlock& block = pblocktemplate->block;
 
     std::vector<CTransactionRef> llmqCommitments;

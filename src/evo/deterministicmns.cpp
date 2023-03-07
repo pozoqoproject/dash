@@ -3,12 +3,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <evo/deterministicmns.h>
+#include <evo/dmn_types.h>
 #include <evo/dmnstate.h>
-#include <evo/specialtx.h>
+#include <evo/providertx.h>
 #include <evo/simplifiedmns.h>
+#include <evo/specialtx.h>
 #include <llmq/commitment.h>
 #include <llmq/utils.h>
-#include <evo/providertx.h>
 
 #include <base58.h>
 #include <chainparams.h>
@@ -24,8 +25,8 @@
 
 #include <memory>
 
-static const std::string DB_LIST_SNAPSHOT = "dmn_S";
-static const std::string DB_LIST_DIFF = "dmn_D";
+static const std::string DB_LIST_SNAPSHOT = "dmn_S2";
+static const std::string DB_LIST_DIFF = "dmn_D2";
 
 std::unique_ptr<CDeterministicMNManager> deterministicMNManager;
 
@@ -49,6 +50,7 @@ void CDeterministicMN::ToJson(UniValue& obj) const
     UniValue stateObj;
     pdmnState->ToJson(stateObj);
 
+    obj.pushKV("type", std::string(GetMnType(nType).description));
     obj.pushKV("proTxHash", proTxHash.ToString());
     obj.pushKV("collateralHash", collateralOutpoint.hash.ToString());
     obj.pushKV("collateralIndex", (int)collateralOutpoint.n);
@@ -175,15 +177,35 @@ static bool CompareByLastPaid(const CDeterministicMN* _a, const CDeterministicMN
     return CompareByLastPaid(*_a, *_b);
 }
 
-CDeterministicMNCPtr CDeterministicMNList::GetMNPayee() const
+CDeterministicMNCPtr CDeterministicMNList::GetMNPayee(const CBlockIndex* pIndex) const
 {
     if (mnMap.size() == 0) {
         return nullptr;
     }
 
-    CDeterministicMNCPtr best;
+    bool isv19Active = llmq::utils::IsV19Active(pIndex);
+    // Starting from v19 and until v20 (Platform release), HPMN will be rewarded 4 blocks in a row
+    // TODO: Skip this code once v20 is active
+    CDeterministicMNCPtr best = nullptr;
+    if (isv19Active) {
+        ForEachMNShared(true, [&](const CDeterministicMNCPtr& dmn) {
+            if (dmn->pdmnState->nLastPaidHeight == nHeight) {
+                // We found the last MN Payee.
+                // If the last payee is a HPMN, we need to check its consecutive payments and pay him again if needed
+                if (dmn->nType == MnType::HighPerformance && dmn->pdmnState->nConsecutivePayments < dmn_types::HighPerformance.voting_weight) {
+                    best = dmn;
+                }
+            }
+        });
+
+        if (best != nullptr) return best;
+
+        // Note: If the last payee was a regular MN or if the payee is a HPMN that was removed from the mnList then that's fine.
+        // We can proceed with classic MN payee selection
+    }
+
     ForEachMNShared(true, [&](const CDeterministicMNCPtr& dmn) {
-        if (!best || CompareByLastPaid(dmn.get(), best.get())) {
+        if (best == nullptr || CompareByLastPaid(dmn.get(), best.get())) {
             best = dmn;
         }
     });
@@ -213,9 +235,9 @@ std::vector<CDeterministicMNCPtr> CDeterministicMNList::GetProjectedMNPayees(int
     return result;
 }
 
-std::vector<CDeterministicMNCPtr> CDeterministicMNList::CalculateQuorum(size_t maxSize, const uint256& modifier) const
+std::vector<CDeterministicMNCPtr> CDeterministicMNList::CalculateQuorum(size_t maxSize, const uint256& modifier, const bool onlyHighPerformanceMasternodes) const
 {
-    auto scores = CalculateScores(modifier);
+    auto scores = CalculateScores(modifier, onlyHighPerformanceMasternodes);
 
     // sort is descending order
     std::sort(scores.rbegin(), scores.rend(), [](const std::pair<arith_uint256, CDeterministicMNCPtr>& a, const std::pair<arith_uint256, CDeterministicMNCPtr>& b) {
@@ -235,7 +257,7 @@ std::vector<CDeterministicMNCPtr> CDeterministicMNList::CalculateQuorum(size_t m
     return result;
 }
 
-std::vector<std::pair<arith_uint256, CDeterministicMNCPtr>> CDeterministicMNList::CalculateScores(const uint256& modifier) const
+std::vector<std::pair<arith_uint256, CDeterministicMNCPtr>> CDeterministicMNList::CalculateScores(const uint256& modifier, const bool onlyHighPerformanceMasternodes) const
 {
     std::vector<std::pair<arith_uint256, CDeterministicMNCPtr>> scores;
     scores.reserve(GetAllMNsCount());
@@ -244,6 +266,10 @@ std::vector<std::pair<arith_uint256, CDeterministicMNCPtr>> CDeterministicMNList
             // we only take confirmed MNs into account to avoid hash grinding on the ProRegTxHash to sneak MNs into a
             // future quorums
             return;
+        }
+        if (onlyHighPerformanceMasternodes) {
+            if (dmn->nType != MnType::HighPerformance)
+                return;
         }
         // calculate sha256(sha256(proTxHash, confirmedHash), modifier) per MN
         // Please note that this is not a double-sha256 but a single-sha256
@@ -351,24 +377,30 @@ CDeterministicMNListDiff CDeterministicMNList::BuildDiff(const CDeterministicMNL
 
 CSimplifiedMNListDiff CDeterministicMNList::BuildSimplifiedDiff(const CDeterministicMNList& to, bool extended) const
 {
+    bool v19active = llmq::utils::IsV19Active(::ChainActive().Tip());
     CSimplifiedMNListDiff diffRet;
     diffRet.baseBlockHash = blockHash;
     diffRet.blockHash = to.blockHash;
+    diffRet.nVersion = v19active ? CSimplifiedMNListDiff::BASIC_BLS_VERSION : CSimplifiedMNListDiff::LEGACY_BLS_VERSION;
 
-    to.ForEachMN(false, [&](auto& toPtr) {
+    to.ForEachMN(false, [&](const auto& toPtr) {
         auto fromPtr = GetMN(toPtr.proTxHash);
         if (fromPtr == nullptr) {
-            diffRet.mnList.emplace_back(toPtr);
+            CSimplifiedMNListEntry sme(toPtr);
+            sme.nVersion = diffRet.nVersion;
+            diffRet.mnList.push_back(std::move(sme));
         } else {
             CSimplifiedMNListEntry sme1(toPtr);
             CSimplifiedMNListEntry sme2(*fromPtr);
-            if (sme1 != sme2) {
-                diffRet.mnList.emplace_back(toPtr);
-            } else if (extended && (sme1.scriptPayout != sme2.scriptPayout || sme1.scriptOperatorPayout != sme2.scriptOperatorPayout)) {
-                diffRet.mnList.emplace_back(toPtr);
+            sme1.nVersion = diffRet.nVersion;
+            sme2.nVersion = diffRet.nVersion;
+            if ((sme1 != sme2) ||
+                (extended && (sme1.scriptPayout != sme2.scriptPayout || sme1.scriptOperatorPayout != sme2.scriptOperatorPayout))) {
+                    diffRet.mnList.push_back(std::move(sme1));
             }
         }
     });
+
     ForEachMN(false, [&](auto& fromPtr) {
         auto toPtr = to.GetMN(fromPtr.proTxHash);
         if (toPtr == nullptr) {
@@ -431,12 +463,20 @@ void CDeterministicMNList::AddMN(const CDeterministicMNCPtr& dmn, bool fBumpTota
     if (!AddUniqueProperty(*dmn, dmn->pdmnState->keyIDOwner)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't add a masternode %s with a duplicate keyIDOwner=%s", __func__,
-                dmn->proTxHash.ToString(), EncodeDestination(dmn->pdmnState->keyIDOwner))));
+                dmn->proTxHash.ToString(), EncodeDestination(PKHash(dmn->pdmnState->keyIDOwner)))));
     }
     if (dmn->pdmnState->pubKeyOperator.Get().IsValid() && !AddUniqueProperty(*dmn, dmn->pdmnState->pubKeyOperator)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't add a masternode %s with a duplicate pubKeyOperator=%s", __func__,
                 dmn->proTxHash.ToString(), dmn->pdmnState->pubKeyOperator.Get().ToString())));
+    }
+
+    if (dmn->nType == MnType::HighPerformance) {
+        if (!AddUniqueProperty(*dmn, dmn->pdmnState->platformNodeID)) {
+            mnUniquePropertyMap = mnUniquePropertyMapSaved;
+            throw(std::runtime_error(strprintf("%s: Can't add a masternode %s with a duplicate platformNodeID=%s", __func__,
+                                               dmn->proTxHash.ToString(), dmn->pdmnState->platformNodeID.ToString())));
+        }
     }
 
     mnMap = mnMap.set(dmn->proTxHash, dmn);
@@ -465,12 +505,19 @@ void CDeterministicMNList::UpdateMN(const CDeterministicMN& oldDmn, const std::s
     if (!UpdateUniqueProperty(*dmn, oldState->keyIDOwner, pdmnState->keyIDOwner)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't update a masternode %s with a duplicate keyIDOwner=%s", __func__,
-                oldDmn.proTxHash.ToString(), EncodeDestination(pdmnState->keyIDOwner))));
+                oldDmn.proTxHash.ToString(), EncodeDestination(PKHash(pdmnState->keyIDOwner)))));
     }
     if (!UpdateUniqueProperty(*dmn, oldState->pubKeyOperator, pdmnState->pubKeyOperator)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't update a masternode %s with a duplicate pubKeyOperator=%s", __func__,
                 oldDmn.proTxHash.ToString(), pdmnState->pubKeyOperator.Get().ToString())));
+    }
+    if (dmn->nType == MnType::HighPerformance) {
+        if (!UpdateUniqueProperty(*dmn, oldState->platformNodeID, dmn->pdmnState->platformNodeID)) {
+            mnUniquePropertyMap = mnUniquePropertyMapSaved;
+            throw(std::runtime_error(strprintf("%s: Can't update a masternode %s with a duplicate platformNodeID=%s", __func__,
+                                               dmn->proTxHash.ToString(), dmn->pdmnState->platformNodeID.ToString())));
+        }
     }
 
     mnMap = mnMap.set(oldDmn.proTxHash, dmn);
@@ -517,12 +564,20 @@ void CDeterministicMNList::RemoveMN(const uint256& proTxHash)
     if (!DeleteUniqueProperty(*dmn, dmn->pdmnState->keyIDOwner)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't delete a masternode %s with a keyIDOwner=%s", __func__,
-                proTxHash.ToString(), EncodeDestination(dmn->pdmnState->keyIDOwner))));
+                proTxHash.ToString(), EncodeDestination(PKHash(dmn->pdmnState->keyIDOwner)))));
     }
     if (dmn->pdmnState->pubKeyOperator.Get().IsValid() && !DeleteUniqueProperty(*dmn, dmn->pdmnState->pubKeyOperator)) {
         mnUniquePropertyMap = mnUniquePropertyMapSaved;
         throw(std::runtime_error(strprintf("%s: Can't delete a masternode %s with a pubKeyOperator=%s", __func__,
                 proTxHash.ToString(), dmn->pdmnState->pubKeyOperator.Get().ToString())));
+    }
+
+    if (dmn->nType == MnType::HighPerformance) {
+        if (!DeleteUniqueProperty(*dmn, dmn->pdmnState->platformNodeID)) {
+            mnUniquePropertyMap = mnUniquePropertyMapSaved;
+            throw(std::runtime_error(strprintf("%s: Can't delete a masternode %s with a duplicate platformNodeID=%s", __func__,
+                                               dmn->proTxHash.ToString(), dmn->pdmnState->platformNodeID.ToString())));
+        }
     }
 
     mnMap = mnMap.erase(proTxHash);
@@ -565,9 +620,9 @@ bool CDeterministicMNManager::ProcessBlock(const CBlock& block, const CBlockInde
         oldList = GetListForBlock(pindex->pprev);
         diff = oldList.BuildDiff(newList);
 
-        evoDb.Write(std::make_pair(DB_LIST_DIFF, newList.GetBlockHash()), diff);
+        m_evoDb.Write(std::make_pair(DB_LIST_DIFF, newList.GetBlockHash()), diff);
         if ((nHeight % DISK_SNAPSHOT_PERIOD) == 0 || oldList.GetHeight() == -1) {
-            evoDb.Write(std::make_pair(DB_LIST_SNAPSHOT, newList.GetBlockHash()), newList);
+            m_evoDb.Write(std::make_pair(DB_LIST_SNAPSHOT, newList.GetBlockHash()), newList);
             mnListsCache.emplace(newList.GetBlockHash(), newList);
             LogPrintf("CDeterministicMNManager::%s -- Wrote snapshot. nHeight=%d, mapCurMNs.allMNsCount=%d\n",
                 __func__, nHeight, newList.GetAllMNsCount());
@@ -609,7 +664,7 @@ bool CDeterministicMNManager::UndoBlock(const CBlock& block, const CBlockIndex* 
     CDeterministicMNListDiff diff;
     {
         LOCK(cs);
-        evoDb.Read(std::make_pair(DB_LIST_DIFF, blockHash), diff);
+        m_evoDb.Read(std::make_pair(DB_LIST_DIFF, blockHash), diff);
 
         if (diff.HasChanges()) {
             // need to call this before erasing
@@ -653,7 +708,7 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
     newList.SetBlockHash(uint256()); // we can't know the final block hash, so better not return a (invalid) block hash
     newList.SetHeight(nHeight);
 
-    auto payee = oldList.GetMNPayee();
+    auto payee = oldList.GetMNPayee(pindexPrev);
 
     // we iterate the oldList here and update the newList
     // this is only valid as long these have not diverged at this point, which is the case as long as we don't add
@@ -690,7 +745,11 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
             }
 
-            auto dmn = std::make_shared<CDeterministicMN>(newList.GetTotalRegisteredCount());
+            if (proTx.nType == MnType::HighPerformance && !llmq::utils::IsV19Active(pindexPrev)) {
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
+            }
+
+            auto dmn = std::make_shared<CDeterministicMN>(newList.GetTotalRegisteredCount(), proTx.nType);
             dmn->proTxHash = tx.GetHash();
 
             // collateralOutpoint is either pointing to an external collateral or to the ProRegTx itself
@@ -701,10 +760,20 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
             }
 
             Coin coin;
-            if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != 1000 * COIN)) {
+             if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+            CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount2;
+            if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral)) {
                 // should actually never get to this point as CheckProRegTx should have handled this case.
                 // We do this additional check nevertheless to be 100% sure
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
+            }
+            } else {
+            CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount;
+            if (!proTx.collateralOutpoint.hash.IsNull() && (!view.GetCoin(dmn->collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral)) {
+                // should actually never get to this point as CheckProRegTx should have handled this case.
+                // We do this additional check nevertheless to be 100% sure
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral");
+            }
             }
 
             auto replacedDmn = newList.GetMNByCollateral(dmn->collateralOutpoint);
@@ -748,6 +817,10 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
             }
 
+            if (proTx.nType == MnType::HighPerformance && !llmq::utils::IsV19Active(pindexPrev)) {
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
+            }
+
             if (newList.HasUniqueProperty(proTx.addr) && newList.GetUniquePropertyMN(proTx.addr)->proTxHash != proTx.proTxHash) {
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_DUPLICATE, "bad-protx-dup-addr");
             }
@@ -756,10 +829,21 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
             if (!dmn) {
                 return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-hash");
             }
+            if (proTx.nType != dmn->nType) {
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-type-mismatch");
+            }
+            if (!IsValidMnType(proTx.nType)) {
+                return _state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-type");
+            }
+
             auto newState = std::make_shared<CDeterministicMNState>(*dmn->pdmnState);
             newState->addr = proTx.addr;
             newState->scriptOperatorPayout = proTx.scriptOperatorPayout;
-
+            if (proTx.nType == MnType::HighPerformance) {
+                newState->platformNodeID = proTx.platformNodeID;
+                newState->platformP2PPort = proTx.platformP2PPort;
+                newState->platformHTTPPort = proTx.platformHTTPPort;
+            }
             if (newState->IsBanned()) {
                 // only revive when all keys are set
                 if (newState->pubKeyOperator.Get().IsValid() && !newState->keyIDVoting.IsNull() && !newState->keyIDOwner.IsNull()) {
@@ -864,10 +948,42 @@ bool CDeterministicMNManager::BuildNewListFromBlock(const CBlock& block, const C
     // The payee for the current block was determined by the previous block's list, but it might have disappeared in the
     // current block. We still pay that MN one last time, however.
     if (payee && newList.HasMN(payee->proTxHash)) {
-        auto newState = std::make_shared<CDeterministicMNState>(*newList.GetMN(payee->proTxHash)->pdmnState);
+        auto dmn = newList.GetMN(payee->proTxHash);
+        auto newState = std::make_shared<CDeterministicMNState>(*dmn->pdmnState);
         newState->nLastPaidHeight = nHeight;
+        // Starting from v19 and until v20, HPMN will be paid 4 blocks in a row
+        // No need to check if v19 is active, since HPMN ProRegTx are allowed only after v19 activation
+        // TODO: Skip this code once v20 is active
+        // Note: If the payee wasn't found in the current block that's fine
+        if (dmn->nType == MnType::HighPerformance) {
+            ++newState->nConsecutivePayments;
+            if (debugLogs) {
+                LogPrintf("CDeterministicMNManager::%s -- MN %s is a HPMN, bumping nConsecutivePayments to %d\n",
+                          __func__, dmn->proTxHash.ToString(), newState->nConsecutivePayments);
+            }
+        }
         newList.UpdateMN(payee->proTxHash, newState);
+        if (debugLogs) {
+            dmn = newList.GetMN(payee->proTxHash);
+            LogPrintf("CDeterministicMNManager::%s -- MN %s, nConsecutivePayments=%d\n",
+                      __func__, dmn->proTxHash.ToString(), dmn->pdmnState->nConsecutivePayments);
+        }
     }
+
+    // reset nConsecutivePayments on non-paid HPMNs
+    auto newList2 = newList;
+    newList2.ForEachMN(false, [&](auto& dmn) {
+        if (payee != nullptr && dmn.proTxHash == payee->proTxHash) return;
+        if (dmn.nType != MnType::HighPerformance) return;
+        if (dmn.pdmnState->nConsecutivePayments == 0) return;
+        if (debugLogs) {
+            LogPrintf("CDeterministicMNManager::%s -- MN %s, reset nConsecutivePayments %d->0\n",
+                      __func__, dmn.proTxHash.ToString(), dmn.pdmnState->nConsecutivePayments);
+        }
+        auto newState = std::make_shared<CDeterministicMNState>(*dmn.pdmnState);
+        newState->nConsecutivePayments = 0;
+        newList.UpdateMN(dmn.proTxHash, newState);
+    });
 
     mnListRet = std::move(newList);
 
@@ -927,7 +1043,7 @@ CDeterministicMNList CDeterministicMNManager::GetListForBlock(const CBlockIndex*
             break;
         }
 
-        if (evoDb.Read(std::make_pair(DB_LIST_SNAPSHOT, pindex->GetBlockHash()), snapshot)) {
+        if (m_evoDb.Read(std::make_pair(DB_LIST_SNAPSHOT, pindex->GetBlockHash()), snapshot)) {
             mnListsCache.emplace(pindex->GetBlockHash(), snapshot);
             break;
         }
@@ -941,7 +1057,7 @@ CDeterministicMNList CDeterministicMNManager::GetListForBlock(const CBlockIndex*
         }
 
         CDeterministicMNListDiff diff;
-        if (!evoDb.Read(std::make_pair(DB_LIST_DIFF, pindex->GetBlockHash()), diff)) {
+        if (!m_evoDb.Read(std::make_pair(DB_LIST_DIFF, pindex->GetBlockHash()), diff)) {
             // no snapshot and no diff on disk means that it's the initial snapshot
             snapshot = CDeterministicMNList(pindex->GetBlockHash(), -1, 0);
             mnListsCache.emplace(pindex->GetBlockHash(), snapshot);
@@ -1008,8 +1124,18 @@ bool CDeterministicMNManager::IsProTxWithCollateral(const CTransactionRef& tx, u
     if (proTx.collateralOutpoint.n >= tx->vout.size() || proTx.collateralOutpoint.n != n) {
         return false;
     }
-    if (tx->vout[n].nValue != 1000 * COIN) {
-        return false;
+
+
+    if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+    const CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount2;
+       if (tx->vout[n].nValue != expectedCollateral) {
+          return false;
+       }
+    } else {
+    const CAmount expectedCollateral = GetMnType(proTx.nType).collat_amount;
+       if (tx->vout[n].nValue != expectedCollateral) {
+          return false;
+       }
     }
     return true;
 }
@@ -1067,120 +1193,92 @@ void CDeterministicMNManager::CleanupCache(int nHeight)
     for (const auto& h : toDeleteDiffs) {
         mnListDiffsCache.erase(h);
     }
+
 }
 
-void CDeterministicMNManager::UpgradeDiff(CDBBatch& batch, const CBlockIndex* pindexNext, const CDeterministicMNList& curMNList, CDeterministicMNList& newMNList)
+bool CDeterministicMNManager::MigrateDBIfNeeded()
 {
-    CDataStream oldDiffData(SER_DISK, CLIENT_VERSION);
-    if (!evoDb.GetRawDB().ReadDataStream(std::make_pair(DB_LIST_DIFF, pindexNext->GetBlockHash()), oldDiffData)) {
-        LogPrintf("CDeterministicMNManager::%s -- no diff found for %s\n", __func__, pindexNext->GetBlockHash().ToString());
-        newMNList = curMNList;
-        newMNList.SetBlockHash(pindexNext->GetBlockHash());
-        newMNList.SetHeight(pindexNext->nHeight);
-        return;
-    }
+    static const std::string DB_OLD_LIST_SNAPSHOT = "dmn_S";
+    static const std::string DB_OLD_LIST_DIFF = "dmn_D";
+    static const std::string DB_OLD_BEST_BLOCK = "b_b2";
 
-    CDeterministicMNListDiff_OldFormat oldDiff;
-    oldDiffData >> oldDiff;
-
-    CDeterministicMNListDiff newDiff;
-    size_t addedCount = 0;
-    for (const auto& p : oldDiff.addedMNs) {
-        auto dmn = std::make_shared<CDeterministicMN>(*p.second, curMNList.GetTotalRegisteredCount() + addedCount);
-        newDiff.addedMNs.emplace_back(dmn);
-        addedCount++;
-    }
-    for (const auto& p : oldDiff.removedMns) {
-        auto dmn = curMNList.GetMN(p);
-        newDiff.removedMns.emplace(dmn->GetInternalId());
-    }
-
-    // applies added/removed MNs
-    newMNList = curMNList.ApplyDiff(pindexNext, newDiff);
-
-    // manually apply updated MNs and calc new state diffs
-    for (const auto& p : oldDiff.updatedMNs) {
-        auto oldMN = newMNList.GetMN(p.first);
-        if (!oldMN) {
-            throw(std::runtime_error(strprintf("%s: Can't find an old masternode with proTxHash=%s", __func__, p.first.ToString())));
-        }
-        newMNList.UpdateMN(p.first, p.second);
-        auto newMN = newMNList.GetMN(p.first);
-        if (!newMN) {
-            throw(std::runtime_error(strprintf("%s: Can't find a new masternode with proTxHash=%s", __func__, p.first.ToString())));
-        }
-
-        newDiff.updatedMNs.emplace(std::piecewise_construct,
-                std::forward_as_tuple(oldMN->GetInternalId()),
-                std::forward_as_tuple(*oldMN->pdmnState, *newMN->pdmnState));
-    }
-
-    batch.Write(std::make_pair(DB_LIST_DIFF, pindexNext->GetBlockHash()), newDiff);
-}
-
-// TODO this can be completely removed in a future version
-bool CDeterministicMNManager::UpgradeDBIfNeeded()
-{
     LOCK(cs_main);
+
+    LogPrintf("CDeterministicMNManager::%s -- upgrading DB to migrate MN type\n", __func__);
 
     if (::ChainActive().Tip() == nullptr) {
         // should have no records
-        return evoDb.IsEmpty();
+        LogPrintf("CDeterministicMNManager::%s -- Chain empty. evoDB:%d.\n", __func__, m_evoDb.IsEmpty());
+        return m_evoDb.IsEmpty();
     }
 
-    if (evoDb.GetRawDB().Exists(EVODB_BEST_BLOCK)) {
+    if (m_evoDb.GetRawDB().Exists(EVODB_BEST_BLOCK)) {
+        LogPrintf("CDeterministicMNManager::%s -- migration already done. skipping.\n", __func__);
         return true;
     }
 
     // Removing the old EVODB_BEST_BLOCK value early results in older version to crash immediately, even if the upgrade
     // process is cancelled in-between. But if the new version sees that the old EVODB_BEST_BLOCK is already removed,
     // then we must assume that the upgrade process was already running before but was interrupted.
-    if (::ChainActive().Height() > 1 && !evoDb.GetRawDB().Exists(std::string("b_b"))) {
+    if (::ChainActive().Height() > 1 && !m_evoDb.GetRawDB().Exists(DB_OLD_BEST_BLOCK)) {
+        LogPrintf("CDeterministicMNManager::%s -- previous migration attempt failed.\n", __func__);
         return false;
     }
-    evoDb.GetRawDB().Erase(std::string("b_b"));
+    m_evoDb.GetRawDB().Erase(DB_OLD_BEST_BLOCK);
 
     if (::ChainActive().Height() < Params().GetConsensus().DIP0003Height) {
         // not reached DIP3 height yet, so no upgrade needed
-        auto dbTx = evoDb.BeginTransaction();
-        evoDb.WriteBestBlock(::ChainActive().Tip()->GetBlockHash());
+        LogPrintf("CDeterministicMNManager::%s -- migration not needed. dip3 not reached\n", __func__);
+        auto dbTx = m_evoDb.BeginTransaction();
+        m_evoDb.WriteBestBlock(::ChainActive().Tip()->GetBlockHash());
         dbTx->Commit();
         return true;
     }
 
-    LogPrintf("CDeterministicMNManager::%s -- upgrading DB to use compact diffs\n", __func__);
+    CDBBatch batch(m_evoDb.GetRawDB());
 
-    CDBBatch batch(evoDb.GetRawDB());
-
-    CDeterministicMNList curMNList;
-    curMNList.SetHeight(Params().GetConsensus().DIP0003Height - 1);
-    curMNList.SetBlockHash(::ChainActive()[Params().GetConsensus().DIP0003Height - 1]->GetBlockHash());
-
-    for (int nHeight = Params().GetConsensus().DIP0003Height; nHeight <= ::ChainActive().Height(); nHeight++) {
+    for (const auto nHeight : irange::range(Params().GetConsensus().DIP0003Height, ::ChainActive().Height() + 1)) {
         auto pindex = ::ChainActive()[nHeight];
-
-        CDeterministicMNList newMNList;
-        UpgradeDiff(batch, pindex, curMNList, newMNList);
-
-        if ((nHeight % DISK_SNAPSHOT_PERIOD) == 0) {
-            batch.Write(std::make_pair(DB_LIST_SNAPSHOT, pindex->GetBlockHash()), newMNList);
-            evoDb.GetRawDB().WriteBatch(batch);
-            batch.Clear();
+        // Unserialise CDeterministicMNListDiff using CURRENT_MN_FORMAT and set it's type to the default value TYPE_REGULAR_MASTERNODE
+        // It will be later written with format MN_TYPE_FORMAT which includes the type field.
+        CDataStream diff_data(SER_DISK, CLIENT_VERSION);
+        if (!m_evoDb.GetRawDB().ReadDataStream(std::make_pair(DB_OLD_LIST_DIFF, pindex->GetBlockHash()), diff_data)) {
+            LogPrintf("CDeterministicMNManager::%s -- missing CDeterministicMNListDiff at height %d\n", __func__, nHeight);
+            return false;
         }
-
-        curMNList = newMNList;
+        CDeterministicMNListDiff mndiff;
+        mndiff.Unserialize(diff_data, CDeterministicMN::CURRENT_MN_FORMAT);
+        batch.Write(std::make_pair(DB_LIST_DIFF, pindex->GetBlockHash()), mndiff);
+        CDataStream snapshot_data(SER_DISK, CLIENT_VERSION);
+        if (!m_evoDb.GetRawDB().ReadDataStream(std::make_pair(DB_OLD_LIST_SNAPSHOT, pindex->GetBlockHash()), snapshot_data)) {
+            // it's ok, we write snapshots every DISK_SNAPSHOT_PERIOD blocks only
+            continue;
+        }
+        CDeterministicMNList mnList;
+        mnList.Unserialize(snapshot_data, CDeterministicMN::CURRENT_MN_FORMAT);
+        batch.Write(std::make_pair(DB_LIST_SNAPSHOT, pindex->GetBlockHash()), mnList);
+        m_evoDb.GetRawDB().WriteBatch(batch);
+        batch.Clear();
+        LogPrintf("CDeterministicMNManager::%s -- wrote snapshot at height %d\n", __func__, nHeight);
     }
 
-    evoDb.GetRawDB().WriteBatch(batch);
+    m_evoDb.GetRawDB().WriteBatch(batch);
 
-    LogPrintf("CDeterministicMNManager::%s -- done upgrading\n", __func__);
-
-    // Writing EVODB_BEST_BLOCK (which is b_b2 now) marks the DB as upgraded
-    auto dbTx = evoDb.BeginTransaction();
-    evoDb.WriteBestBlock(::ChainActive().Tip()->GetBlockHash());
+    // Writing EVODB_BEST_BLOCK (which is b_b3 now) marks the DB as upgraded
+    auto dbTx = m_evoDb.BeginTransaction();
+    m_evoDb.WriteBestBlock(::ChainActive().Tip()->GetBlockHash());
     dbTx->Commit();
 
-    evoDb.GetRawDB().CompactFull();
+    LogPrintf("CDeterministicMNManager::%s -- done migrating\n", __func__);
+
+    m_evoDb.GetRawDB().Erase(DB_OLD_LIST_DIFF);
+    m_evoDb.GetRawDB().Erase(DB_OLD_LIST_SNAPSHOT);
+
+    LogPrintf("CDeterministicMNManager::%s -- done cleaning old data\n", __func__);
+
+    m_evoDb.GetRawDB().CompactFull();
+
+    LogPrintf("CDeterministicMNManager::%s -- done compacting database\n", __func__);
 
     return true;
 }
@@ -1212,20 +1310,58 @@ static bool CheckService(const ProTx& proTx, CValidationState& state)
 }
 
 template <typename ProTx>
-static bool CheckHashSig(const ProTx& proTx, const CKeyID& keyID, CValidationState& state)
+static bool CheckPlatformFields(const ProTx& proTx, CValidationState& state)
+{
+    if (proTx.platformNodeID.IsNull()) {
+        return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-nodeid");
+    }
+
+    static int mainnetPlatformP2PPort = CreateChainParams(CBaseChainParams::MAIN)->GetDefaultPlatformP2PPort();
+    if (Params().NetworkIDString() == CBaseChainParams::MAIN) {
+        if (proTx.platformP2PPort != mainnetPlatformP2PPort) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-p2p-port");
+        }
+    }
+
+    static int mainnetPlatformHTTPPort = CreateChainParams(CBaseChainParams::MAIN)->GetDefaultPlatformHTTPPort();
+    if (Params().NetworkIDString() == CBaseChainParams::MAIN) {
+        if (proTx.platformHTTPPort != mainnetPlatformHTTPPort) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-http-port");
+        }
+    }
+
+    static int mainnetDefaultP2PPort = CreateChainParams(CBaseChainParams::MAIN)->GetDefaultPort();
+    if (proTx.platformP2PPort == mainnetDefaultP2PPort) {
+        return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-p2p-port");
+    }
+    if (proTx.platformHTTPPort == mainnetDefaultP2PPort) {
+        return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-http-port");
+    }
+
+    if (proTx.platformP2PPort == proTx.platformHTTPPort ||
+        proTx.platformP2PPort == proTx.addr.GetPort() ||
+        proTx.platformHTTPPort == proTx.addr.GetPort()) {
+        return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-platform-dup-ports");
+    }
+
+    return true;
+}
+
+template <typename ProTx>
+static bool CheckHashSig(const ProTx& proTx, const PKHash& pkhash, CValidationState& state)
 {
     std::string strError;
-    if (!CHashSigner::VerifyHash(::SerializeHash(proTx), keyID, proTx.vchSig, strError)) {
+    if (!CHashSigner::VerifyHash(::SerializeHash(proTx), CKeyID(pkhash), proTx.vchSig, strError)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-sig");
     }
     return true;
 }
 
 template <typename ProTx>
-static bool CheckStringSig(const ProTx& proTx, const CKeyID& keyID, CValidationState& state)
+static bool CheckStringSig(const ProTx& proTx, const PKHash& pkhash, CValidationState& state)
 {
     std::string strError;
-    if (!CMessageSigner::VerifyMessage(keyID, proTx.vchSig, proTx.MakeSignString(), strError)) {
+    if (!CMessageSigner::VerifyMessage(CKeyID(pkhash), proTx.vchSig, proTx.MakeSignString(), strError)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-sig");
     }
     return true;
@@ -1251,7 +1387,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
+    if (auto maybe_err = ptx.IsTriviallyValid(llmq::utils::IsV19Active(pindexPrev)); maybe_err.did_err) {
         return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
     }
 
@@ -1262,13 +1398,21 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         return false;
     }
 
-    CTxDestination collateralTxDest;
-    const CKeyID *keyForPayloadSig = nullptr;
-    COutPoint collateralOutpoint;
+    if (ptx.nType == MnType::HighPerformance) {
+        if (!CheckPlatformFields(ptx, state)) {
+            return false;
+        }
+    }
 
-    if (!ptx.collateralOutpoint.hash.IsNull()) {
+    CTxDestination collateralTxDest;
+    const PKHash *keyForPayloadSig = nullptr;
+    COutPoint collateralOutpoint;
+    int nHeight = pindexPrev->nHeight + 1;
+  if (::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR) {
+    CAmount expectedCollateral = GetMnType(ptx.nType).collat_amount2;
+  if (!ptx.collateralOutpoint.hash.IsNull()) {
         Coin coin;
-        if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != 1000 * COIN) {
+        if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
         }
 
@@ -1278,7 +1422,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
 
         // Extract key from collateral. This only works for P2PK and P2PKH collaterals and will fail for P2SH.
         // Issuer of this ProRegTx must prove ownership with this key by signing the ProRegTx
-        keyForPayloadSig = std::get_if<CKeyID>(&collateralTxDest);
+        keyForPayloadSig = std::get_if<PKHash>(&collateralTxDest);
         if (!keyForPayloadSig) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-pkh");
         }
@@ -1288,7 +1432,7 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         if (ptx.collateralOutpoint.n >= tx.vout.size()) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-index");
         }
-        if (tx.vout[ptx.collateralOutpoint.n].nValue != 1000 * COIN) {
+        if (tx.vout[ptx.collateralOutpoint.n].nValue != expectedCollateral) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
         }
 
@@ -1298,10 +1442,46 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
 
         collateralOutpoint = COutPoint(tx.GetHash(), ptx.collateralOutpoint.n);
     }
+    } else {
+    CAmount expectedCollateral = GetMnType(ptx.nType).collat_amount;
+    if (!ptx.collateralOutpoint.hash.IsNull()) {
+        Coin coin;
+        if (!view.GetCoin(ptx.collateralOutpoint, coin) || coin.IsSpent() || coin.out.nValue != expectedCollateral) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
+        }
+
+        if (!ExtractDestination(coin.out.scriptPubKey, collateralTxDest)) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-dest");
+        }
+
+        // Extract key from collateral. This only works for P2PK and P2PKH collaterals and will fail for P2SH.
+        // Issuer of this ProRegTx must prove ownership with this key by signing the ProRegTx
+        keyForPayloadSig = std::get_if<PKHash>(&collateralTxDest);
+        if (!keyForPayloadSig) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-pkh");
+        }
+
+        collateralOutpoint = ptx.collateralOutpoint;
+    } else {
+        if (ptx.collateralOutpoint.n >= tx.vout.size()) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-index");
+        }
+        if (tx.vout[ptx.collateralOutpoint.n].nValue != expectedCollateral) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral");
+        }
+
+        if (!ExtractDestination(tx.vout[ptx.collateralOutpoint.n].scriptPubKey, collateralTxDest)) {
+            return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-dest");
+        }
+
+        collateralOutpoint = COutPoint(tx.GetHash(), ptx.collateralOutpoint.n);
+    }
+   }
+
 
     // don't allow reuse of collateral key for other keys (don't allow people to put the collateral key onto an online server)
     // this check applies to internal and external collateral, but internal collaterals are not necessarily a P2PKH
-    if (collateralTxDest == CTxDestination(ptx.keyIDOwner) || collateralTxDest == CTxDestination(ptx.keyIDVoting)) {
+    if (collateralTxDest == CTxDestination(PKHash(ptx.keyIDOwner)) || collateralTxDest == CTxDestination(PKHash(ptx.keyIDVoting))) {
         return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-reuse");
     }
 
@@ -1356,13 +1536,19 @@ bool CheckProUpServTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVa
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
+    if (auto maybe_err = ptx.IsTriviallyValid(llmq::utils::IsV19Active(pindexPrev)); maybe_err.did_err) {
         return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
     }
 
     if (!CheckService(ptx, state)) {
         // pass the state returned by the function above
         return false;
+    }
+
+    if (ptx.nType == MnType::HighPerformance) {
+        if (!CheckPlatformFields(ptx, state)) {
+            return false;
+        }
     }
 
     if (pindexPrev) {
@@ -1411,7 +1597,7 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
+    if (auto maybe_err = ptx.IsTriviallyValid(llmq::utils::IsV19Active(pindexPrev)); maybe_err.did_err) {
         return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
     }
 
@@ -1429,7 +1615,7 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         }
 
         // don't allow reuse of payee key for other keys (don't allow people to put the payee key onto an online server)
-        if (payoutDest == CTxDestination(dmn->pdmnState->keyIDOwner) || payoutDest == CTxDestination(ptx.keyIDVoting)) {
+        if (payoutDest == CTxDestination(PKHash(dmn->pdmnState->keyIDOwner)) || payoutDest == CTxDestination(PKHash(ptx.keyIDVoting))) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-payee-reuse");
         }
 
@@ -1444,7 +1630,7 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         if (!ExtractDestination(coin.out.scriptPubKey, collateralTxDest)) {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-collateral-dest");
         }
-        if (collateralTxDest == CTxDestination(dmn->pdmnState->keyIDOwner) || collateralTxDest == CTxDestination(ptx.keyIDVoting)) {
+        if (collateralTxDest == CTxDestination(PKHash(dmn->pdmnState->keyIDOwner)) || collateralTxDest == CTxDestination(PKHash(ptx.keyIDVoting))) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-protx-collateral-reuse");
         }
 
@@ -1464,7 +1650,7 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.did_err) {
             return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
         }
-        if (check_sigs && !CheckHashSig(ptx, dmn->pdmnState->keyIDOwner, state)) {
+        if (check_sigs && !CheckHashSig(ptx, PKHash(dmn->pdmnState->keyIDOwner), state)) {
             // pass the state returned by the function above
             return false;
         }
@@ -1484,7 +1670,7 @@ bool CheckProUpRevTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
+    if (auto maybe_err = ptx.IsTriviallyValid(llmq::utils::IsV19Active(pindexPrev)); maybe_err.did_err) {
         return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
     }
 

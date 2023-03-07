@@ -102,6 +102,7 @@ BASE_SCRIPTS = [
     'wallet_labels.py',
     'p2p_timeouts.py',
     'feature_bip68_sequence.py',
+    'mempool_updatefromblock.py',
     'wallet_dump.py',
     'wallet_listtransactions.py',
     'feature_multikeysporks.py',
@@ -110,6 +111,7 @@ BASE_SCRIPTS = [
     'feature_llmq_chainlocks.py', # NOTE: needs pozoqo_hash to pass
     'feature_llmq_rotation.py', # NOTE: needs pozoqo_hash to pass
     'feature_llmq_connections.py', # NOTE: needs pozoqo_hash to pass
+    'feature_llmq_hpmn.py', # NOTE: needs pozoqo_hash to pass
     'feature_llmq_simplepose.py', # NOTE: needs pozoqo_hash to pass
     'feature_llmq_is_cl_conflicts.py', # NOTE: needs pozoqo_hash to pass
     'feature_llmq_is_migration.py', # NOTE: needs pozoqo_hash to pass
@@ -168,6 +170,7 @@ BASE_SCRIPTS = [
     'rpc_blockchain.py',
     'rpc_deprecated.py',
     'wallet_disable.py',
+    'p2p_getdata.py',
     'rpc_net.py',
     'wallet_keypool.py',
     'wallet_keypool_hd.py',

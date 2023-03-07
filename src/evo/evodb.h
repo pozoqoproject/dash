@@ -11,7 +11,8 @@
 
 // "b_b" was used in the initial version of deterministic MN storage
 // "b_b2" was used after compact diffs were introduced
-static const std::string EVODB_BEST_BLOCK = "b_b2";
+// "b_b3" was used after masternode type introduction in evoDB
+static const std::string EVODB_BEST_BLOCK = "b_b3";
 
 class CEvoDB;
 
@@ -109,7 +110,5 @@ private:
     void CommitCurTransaction() LOCKS_EXCLUDED(cs);
     void RollbackCurTransaction() LOCKS_EXCLUDED(cs);
 };
-
-extern std::unique_ptr<CEvoDB> evoDb;
 
 #endif // BITCOIN_EVO_EVODB_H

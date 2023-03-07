@@ -54,10 +54,11 @@ namespace std
     };
 }
 
+using SporkValue = int64_t;
 struct CSporkDef
 {
     SporkId sporkId{SPORK_INVALID};
-    int64_t defaultValue{0};
+    SporkValue defaultValue{0};
     std::string_view name;
 };
 
@@ -99,10 +100,10 @@ private:
 
 public:
     SporkId nSporkID{0};
-    int64_t nValue{0};
+    SporkValue nValue{0};
     int64_t nTimeSigned{0};
 
-    CSporkMessage(SporkId nSporkID, int64_t nValue, int64_t nTimeSigned) :
+    CSporkMessage(SporkId nSporkID, SporkValue nValue, int64_t nTimeSigned) :
         nSporkID(nSporkID),
         nValue(nValue),
         nTimeSigned(nTimeSigned)
@@ -167,7 +168,7 @@ private:
     mutable std::unordered_map<const SporkId, bool> mapSporksCachedActive GUARDED_BY(cs_mapSporksCachedActive);
 
     mutable Mutex cs_mapSporksCachedValues;
-    mutable std::unordered_map<SporkId, int64_t> mapSporksCachedValues GUARDED_BY(cs_mapSporksCachedValues);
+    mutable std::unordered_map<SporkId, SporkValue> mapSporksCachedValues GUARDED_BY(cs_mapSporksCachedValues);
 
     mutable Mutex cs;
 
@@ -182,7 +183,7 @@ private:
      * SporkValueIfActive is used to get the value agreed upon by the majority
      * of signed spork messages for a given Spork ID.
      */
-    std::optional<int64_t> SporkValueIfActive(SporkId nSporkID) const EXCLUSIVE_LOCKS_REQUIRED(cs);
+    std::optional<SporkValue> SporkValueIfActive(SporkId nSporkID) const EXCLUSIVE_LOCKS_REQUIRED(cs);
 
 public:
 
@@ -230,9 +231,9 @@ public:
     void CheckAndRemove() LOCKS_EXCLUDED(cs);
 
     /**
-     * ProcessSporkMessages is used to call ProcessSpork and ProcessGetSporks. See below
+     * ProcessMessage is used to call ProcessSpork and ProcessGetSporks. See below
      */
-    void ProcessSporkMessages(CNode& peer, std::string_view msg_type, CDataStream& vRecv, CConnman& connman);
+    void ProcessMessage(CNode& peer, CConnman& connman, std::string_view msg_type, CDataStream& vRecv);
 
     /**
      * ProcessSpork is used to handle the 'spork' p2p message.
@@ -240,7 +241,7 @@ public:
      * For 'spork', it validates the spork and adds it to the internal spork storage and
      * performs any necessary processing.
      */
-    void ProcessSpork(const CNode& peer, CDataStream& vRecv, CConnman& connman) LOCKS_EXCLUDED(cs);
+    void ProcessSpork(const CNode& peer, CConnman& connman, CDataStream& vRecv) LOCKS_EXCLUDED(cs);
 
 
     /**
@@ -254,7 +255,7 @@ public:
      * UpdateSpork is used by the spork RPC command to set a new spork value, sign
      * and broadcast the spork message.
      */
-    bool UpdateSpork(SporkId nSporkID, int64_t nValue, CConnman& connman) LOCKS_EXCLUDED(cs);
+    bool UpdateSpork(SporkId nSporkID, SporkValue nValue, CConnman& connman) LOCKS_EXCLUDED(cs);
 
     /**
      * IsSporkActive returns a bool for time-based sporks, and should be used
@@ -270,7 +271,7 @@ public:
      * GetSporkValue returns the spork value given a Spork ID. If no active spork
      * message has yet been received by the node, it returns the default value.
      */
-    int64_t GetSporkValue(SporkId nSporkID) const LOCKS_EXCLUDED(cs);
+    SporkValue GetSporkValue(SporkId nSporkID) const LOCKS_EXCLUDED(cs);
 
     /**
      * GetSporkIDByName returns the internal Spork ID given the spork name.
