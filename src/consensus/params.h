@@ -109,7 +109,7 @@ struct Params {
     int64_t nPowTargetTimespanNew;
     int nPOWR;
     int64_t DifficultyAdjustmentInterval() const {
-    if (nPOWR >= 7000) {
+    if (nPOWR >= 8000) {
         return nPowTargetTimespanNew / nPowTargetSpacing;
     } else {
         return nPowTargetTimespan / nPowTargetSpacing;

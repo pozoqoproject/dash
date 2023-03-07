@@ -180,7 +180,7 @@ public:
         consensus.nBlocksPerDay = 1440;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        consensus.nPOWR = 7000;
+        consensus.nPOWR = 8000;
         consensus.nRuleChangeActivationThreshold = 95; // 95% of 2016
         consensus.nMinerConfirmationWindow = 1; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -291,11 +291,9 @@ public:
         vSeeds.emplace_back("dnsseed-01.pozoqo.tech");
         vSeeds.emplace_back("129.151.165.124");
 
-        // Dash addresses start with 'P'
+        // Pozoqo addresses start with 'P'
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,55);
-        // Pozoqo script addresses start with '7'
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,117);
-        // Pozoqo private keys start with '7' or 'X'
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,183);
         // Pozoqo BIP32 pubkeys start with 'xpub' (Bitcoin defaults)
         base58Prefixes[EXT_PUBLIC_KEY] = {0x04, 0x88, 0xB2, 0x1E};
@@ -392,8 +390,8 @@ public:
         consensus.BRRHeight = 387500; // 0000001537dbfd09dea69f61c1f8b2afa27c8dc91c934e144797761c9f10367b
         consensus.MinBIP9WarningHeight = 80816;  // dip8 activation height + miner confirmation window
         consensus.powLimit = uint256S("00000fffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // ~uint256(0) >> 20
-        consensus.nPowTargetTimespan = 24 * 60 * 60; // Pozoqo: 1 day
-        consensus.nPowTargetSpacing = 2.5 * 60; // Pozoqo: 2.5 minutes
+        consensus.nPowTargetTimespan = 30 * 60; // Pozoqo: 30 minutes
+        consensus.nPowTargetSpacing =  60; // Pozoqo: 1 minutes
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
@@ -472,10 +470,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_V19].nFalloffCoeff = 5;            // this corresponds to 10 periods
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000002d68c04d48c0c9c"); // 808000
+        consensus.nMinimumChainWork = uint256S("0x");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x00000104cb60a2b5e00a8a4259582756e5bf0dca201c0993c63f0e54971ea91a"); // 808000
+        consensus.defaultAssumeValid = uint256S("0x");
 
         pchMessageStart[0] = 0xce;
         pchMessageStart[1] = 0xe2;
@@ -547,15 +545,7 @@ public:
 
         checkpointData = {
             {
-                {261, uint256S("0x00000c26026d0815a7e2ce4fa270775f61403c040647ff2c3091f99e894a4618")},
-                {1999, uint256S("0x00000052e538d27fa53693efe6fb6892a0c1d26c0235f599171c48a3cce553b1")},
-                {2999, uint256S("0x0000024bc3f4f4cb30d29827c13d921ad77d2c6072e586c7f60d83c2722cdcc5")},
-                {96090, uint256S("0x00000000033df4b94d17ab43e999caaf6c4735095cc77703685da81254d09bba")},
-                {200000, uint256S("0x000000001015eb5ef86a8fe2b3074d947bc972c5befe32b28dd5ce915dc0d029")},
-                {395750, uint256S("0x000008b78b6aef3fd05ab78db8b76c02163e885305545144420cb08704dce538")},
-                {470000, uint256S("0x0000009303aeadf8cf3812f5c869691dbd4cb118ad20e9bf553be434bafe6a52")},
-                {794950, uint256S("0x000001860e4c7248a9c5cc3bc7106041750560dc5cd9b3a2641b49494bcff5f2")},
-                {808000, uint256S("0x00000104cb60a2b5e00a8a4259582756e5bf0dca201c0993c63f0e54971ea91a")},
+                {0, uint256S("0x")},
             }
         };
 
