@@ -1,4 +1,4 @@
-Pozoqo Core staging tree 18.0
+Pozoqo Core staging tree 19.0
 ===========================
 
 |CI|master|develop|
