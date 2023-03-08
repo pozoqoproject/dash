@@ -181,6 +181,7 @@ public:
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
         consensus.nPOWR = 8000;
+        consensus.Remove1000Reward = 10000;
         consensus.nRuleChangeActivationThreshold = 95; // 95% of 2016
         consensus.nMinerConfirmationWindow = 1; // nPowTargetTimespan / nPowTargetSpacing
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -257,10 +258,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_V19].nFalloffCoeff = 5;            // this corresponds to 10 periods
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000000001eeb2416");
+        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000000722d57173");
 
         // By default assume that the signatures in ancestors of this block are valid.
-        consensus.defaultAssumeValid = uint256S("0x000007f3bb8e1093f11dcf7e75b552a3e81baff7a4635d815c644b684674d725"); //
+        consensus.defaultAssumeValid = uint256S("0x0000021d454240c90a7e1fc0d23b34cc4afe3c92a928d627d03d9d0d705b29be"); //
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
@@ -343,14 +344,16 @@ public:
                 {100, uint256S("0x0000055e010d5de3f8283eec89f1cad40c77a8b52d78c6a13818a2bbc96e1f42")},
                 {300, uint256S("0x00000966010cdeedf882fa87a22cce50b5d1045c0ac7e2a41330e99db12c3c35")},
                 {350, uint256S("0x0000009a0366afbd0af870b6a8c20a34f4eaab39f52b39b672865b02a9aad7da")},
+                {9043, uint256S("0x0000000f01de3844f41471c51f1cc3698bc50b904dc2c310fdb26846b1e21610")},
+                {9049, uint256S("0x0000021d454240c90a7e1fc0d23b34cc4afe3c92a928d627d03d9d0d705b29be")},
             }
         };
 
         // getchaintxstats 17280 000000000000001d531f36005159f19351bd49ca676398a561e55dcccb84eacd
         chainTxData = ChainTxData{
-                1676706219,
-                599,
-                0.01419130930873823,
+                1678316797,
+                15555,
+                0.009410399420116582,
         };
     }
 };

@@ -108,6 +108,7 @@ struct Params {
     int64_t nPowTargetTimespan;
     int64_t nPowTargetTimespanNew;
     int nPOWR;
+    int Remove1000Reward;
     int64_t DifficultyAdjustmentInterval() const {
     if (nPOWR >= 8000) {
         return nPowTargetTimespanNew / nPowTargetSpacing;

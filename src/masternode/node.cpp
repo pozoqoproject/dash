@@ -91,6 +91,8 @@ void CActiveMasternodeManager::Init(const CBlockIndex* pindex)
         // MN not appeared on the chain yet
         return;
     }
+    const Consensus::Params& consensusParams = Params().GetConsensus();
+      CProUpServTx proTx;
 
     if (!mnList.IsMNValid(dmn->proTxHash)) {
         if (mnList.IsMNPoSeBanned(dmn->proTxHash)) {

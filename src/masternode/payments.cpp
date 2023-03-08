@@ -7,6 +7,9 @@
 #include <amount.h>
 #include <chain.h>
 #include <chainparams.h>
+#include <evo/providertx.h>
+#include <evo/simplifiedmns.h>
+#include <evo/specialtx.h>
 #include <evo/deterministicmns.h>
 #include <governance/classes.h>
 #include <governance/governance.h>
@@ -234,9 +237,17 @@ void FillBlockPayments(const CSporkManager& sporkManager, CGovernanceManager& go
     txNew.vout.insert(txNew.vout.end(), voutSuperblockPaymentsRet.begin(), voutSuperblockPaymentsRet.end());
 
     std::string voutMasternodeStr;
+    const Consensus::Params& consensusParams = Params().GetConsensus();
     for (const auto& txout : voutMasternodePaymentsRet) {
         // subtract MN payment from miner reward
+      CProUpServTx proTx;
+      if (CAmount nMasternodeCollateral = GetMnType(proTx.nType).collat_amount2 && nBlockHeight >= consensusParams.Remove1000Reward){
         txNew.vout[0].nValue -= txout.nValue;
+        } else if (CAmount nMasternodeCollateral = GetMnType(proTx.nType).collat_amount && nBlockHeight >= consensusParams.Remove1000Reward){
+	txNew.vout[0].nValue *= 0;
+	} else {
+        txNew.vout[0].nValue -= txout.nValue;
+        }
         if (!voutMasternodeStr.empty())
             voutMasternodeStr += ",";
         voutMasternodeStr += txout.ToString();
@@ -301,6 +312,8 @@ bool CMasternodePayments::GetBlockTxOuts(int nBlockHeight, CAmount blockReward, 
 
     return true;
 }
+
+
 
 bool CMasternodePayments::IsTransactionValid(const CTransaction& txNew, int nBlockHeight, CAmount blockReward)
 {

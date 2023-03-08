@@ -1035,7 +1035,7 @@ CAmount GetBlockSubsidy(int nPrevBits, int nPrevHeight, const Consensus::Params&
 
     int nProofOfWorkReward = Params().GetConsensus().nPOWR;
     // Adjust reward based on difficulty starting from height nPOWR
-    if (nPrevHeight >= nProofOfWorkReward) {
+    if (nPrevHeight >= nProofOfWorkReward && nPrevHeight <= 10000) {
         int nShift = nPrevBits >> 24;
         double dDifficulty = (double)(0x0000ffff) / (double)(nPrevBits & 0x00ffffff);
         double dFactor = std::max(1.0, pow(2.0, (nShift - 16))) * dDifficulty;
@@ -1050,7 +1050,7 @@ CAmount GetBlockSubsidy(int nPrevBits, int nPrevHeight, const Consensus::Params&
     }
 
     // Burn 30% of block reward at height 5000 and above
-    if (nPrevHeight >= nProofOfWorkReward) {
+    if (nPrevHeight >= nProofOfWorkReward && nPrevHeight <= 10000 ) {
         nSubsidy *= 0.7;
     }
 
@@ -1061,7 +1061,10 @@ CAmount GetBlockSubsidy(int nPrevBits, int nPrevHeight, const Consensus::Params&
 CAmount GetMasternodePayment(int nHeight, CAmount blockValue, int nReallocActivationHeight)
 {
     int nProofOfWorkReward = Params().GetConsensus().nPOWR;
-    if(::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR >= nProofOfWorkReward) {
+    if(::ChainActive().Tip()->nHeight >= Params().GetConsensus().nPOWR >= nProofOfWorkReward && nHeight <= 10000) {
+    CAmount ret = blockValue/3;
+    return ret;
+    } else if (nHeight >= 10000){
     CAmount ret = blockValue/3;
     return ret;
     } else {
